@@ -50,6 +50,7 @@ const subtitleTrack = document.getElementById('subtitleTrack');
 const playerWrap = document.getElementById('playerWrap');
 const playerControls = document.getElementById('playerControls');
 const bigPlayBtn = document.getElementById('bigPlayBtn');
+const playerError = document.getElementById('playerError');
 const backBtn = document.getElementById('backBtn');
 const playerTitle = document.getElementById('playerTitle');
 const seekBar = document.getElementById('seekBar');
@@ -180,34 +181,76 @@ function updateSignInButton() {
     : 'Đăng nhập Google để tránh lỗi "download quota exceeded"';
 }
 
+// ---------------- Nhận diện TV / trình duyệt cũ không hỗ trợ đăng nhập Google ----------------
+// Google chặn hẳn luồng OAuth (lỗi "disallowed_useragent") trên nhiều
+// trình duyệt TV đời cũ / WebView nhúng. Vì đây là chặn từ phía Google,
+// không có cách nào vượt qua bằng code, nên tốt nhất là ẩn hẳn nút đăng
+// nhập trên các thiết bị này để tránh người dùng bị kẹt ở màn hình lỗi.
+function isLikelyUnsupportedAuthBrowser() {
+  const ua = navigator.userAgent || '';
+  const tvPattern = /SmartTV|Tizen|Web0S|WebOS|NetCast|BRAVIA|VIDAA|HbbTV|CrKey|AFTM|AFTT|AFTS|AFTB|AFTA|Roku|PhilipsTV|GoogleTV|SMART-TV|DuiD|POV_TV|TV Store|LG Browser|Espial|OMI\/|Quest/i;
+  if (tvPattern.test(ua)) return true;
+  // Engine quá cũ (thường thấy trên TV) sẽ thiếu các API JS hiện đại này.
+  if (typeof Promise === 'undefined' || typeof fetch === 'undefined') return true;
+  if (!window.crypto || !window.crypto.subtle) return true;
+  return false;
+}
+
+let authInitAttempts = 0;
+const AUTH_INIT_MAX_ATTEMPTS = 15; // ~4.5s, sau đó coi như trình duyệt không hỗ trợ
+
+function hideSignInButton() {
+  if (signInBtn) signInBtn.classList.add('hidden');
+}
+
 function initGoogleAuth() {
+  if (isLikelyUnsupportedAuthBrowser()) {
+    hideSignInButton();
+    return;
+  }
   if (!window.google || !google.accounts || !google.accounts.oauth2) {
+    authInitAttempts++;
+    if (authInitAttempts >= AUTH_INIT_MAX_ATTEMPTS) {
+      // Thư viện đăng nhập Google không load được (mạng chặn, trình
+      // duyệt không hỗ trợ...) - ẩn nút để tránh bấm vào bị lỗi.
+      hideSignInButton();
+      return;
+    }
     // Thư viện GIS load async, thử lại sau 300ms nếu chưa sẵn sàng
     setTimeout(initGoogleAuth, 300);
     return;
   }
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: OAUTH_CLIENT_ID,
-    scope: OAUTH_SCOPE,
-    callback: function (response) {
-      if (response && response.access_token) {
-        accessToken = response.access_token;
-        sendTokenToServiceWorker(accessToken);
-        updateSignInButton();
-        // Đặt hẹn giờ tự hỏi lại token mới trước khi hết hạn (~1 giờ)
-        const expiresInMs = (response.expires_in || 3600) * 1000;
-        setTimeout(function () {
-          if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
-        }, Math.max(expiresInMs - 60000, 30000));
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: OAUTH_CLIENT_ID,
+      scope: OAUTH_SCOPE,
+      callback: function (response) {
+        if (response && response.access_token) {
+          accessToken = response.access_token;
+          sendTokenToServiceWorker(accessToken);
+          updateSignInButton();
+          // Đặt hẹn giờ tự hỏi lại token mới trước khi hết hạn (~1 giờ)
+          const expiresInMs = (response.expires_in || 3600) * 1000;
+          setTimeout(function () {
+            if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+          }, Math.max(expiresInMs - 60000, 30000));
+        }
+      },
+      error_callback: function () {
+        // Google báo không đăng nhập được (vd. disallowed_useragent) -
+        // im lặng bỏ qua, người dùng vẫn dùng được app qua API key.
       }
-    }
-  });
+    });
+  } catch (e) {
+    hideSignInButton();
+  }
 }
 
 if (signInBtn) {
   signInBtn.addEventListener('click', function () {
+    if (isLikelyUnsupportedAuthBrowser()) { hideSignInButton(); return; }
     if (!tokenClient) { initGoogleAuth(); setTimeout(function () { if (tokenClient) tokenClient.requestAccessToken(); }, 500); return; }
-    tokenClient.requestAccessToken();
+    try { tokenClient.requestAccessToken(); } catch (e) { /* bỏ qua, dùng API key */ }
   });
 }
 
@@ -692,18 +735,64 @@ function showControls() {
   }
 }
 
+function showPlayerError(message) {
+  if (!playerError) return;
+  playerError.textContent = message;
+  playerError.classList.remove('hidden');
+}
+
+function hidePlayerError() {
+  if (!playerError) return;
+  playerError.classList.add('hidden');
+  playerError.textContent = '';
+}
+
+// Gọi thử 1 byte đầu của file trước khi gán vào thẻ <video>, để phát
+// hiện sớm lỗi 403 (file chưa chia sẻ công khai) / 404 (file bị xoá,
+// sai ID) và báo rõ ràng, thay vì để video đơ im lặng không rõ lý do.
+async function checkPlayableUrl(url) {
+  try {
+    const res = await fetch(url, { headers: { Range: 'bytes=0-0' } });
+    if (res.ok || res.status === 206) return { ok: true };
+    return { ok: false, status: res.status };
+  } catch (e) {
+    // Lỗi mạng/CORS: thường đi kèm 403 phía server không trả header
+    // CORS, trình duyệt báo thành lỗi "Failed to fetch" chung chung.
+    return { ok: false, status: null };
+  }
+}
+
+function describePlaybackError(status) {
+  if (status === 403) {
+    return 'Không phát được video (lỗi 403). Nhiều khả năng file trên Google Drive chưa để chia sẻ "Bất kỳ ai có đường liên kết → Người xem". Vào Drive, chuột phải vào file → Chia sẻ → đổi thành "Bất kỳ ai có đường liên kết", quyền Người xem.';
+  }
+  if (status === 404) {
+    return 'Không tìm thấy video (lỗi 404). File có thể đã bị xoá hoặc di chuyển khỏi thư mục trên Google Drive.';
+  }
+  return 'Không phát được video. Vui lòng kiểm tra lại kết nối mạng hoặc quyền chia sẻ file trên Google Drive rồi tải lại trang.';
+}
+
 async function openPlayer(rawVideo) {
   const video = decorate(rawVideo);
   const c = getConfig();
   currentVideo = video;
   clearSubtitle();
+  hidePlayerError();
 
   playerTitle.textContent = video.title;
-  videoPlayer.src = streamUrl(video.fileId, c.apiKey);
+  const vidUrl = streamUrl(video.fileId, c.apiKey);
   videoPlayer.playbackRate = SPEEDS[speedIndex];
   speedBtn.textContent = SPEEDS[speedIndex] + 'x';
   showScreen('player');
   showControls();
+
+  const check = await checkPlayableUrl(vidUrl);
+  if (!check.ok) {
+    showPlayerError(describePlaybackError(check.status));
+    return;
+  }
+
+  videoPlayer.src = vidUrl;
 
   const saved = getProgress(video.fileId);
   if (saved && saved.time > 5 && saved.duration && saved.time < saved.duration - 5) {
@@ -729,6 +818,14 @@ async function openPlayer(rawVideo) {
   }
 }
 
+videoPlayer.addEventListener('error', function () {
+  // Trường hợp preflight qua được nhưng thẻ <video> vẫn không phát nổi
+  // (vd. định dạng codec không hỗ trợ, hoặc lỗi phát sinh giữa chừng).
+  if (currentVideo && playerError && playerError.classList.contains('hidden')) {
+    showPlayerError('Không phát được video này. Định dạng có thể không được trình duyệt hỗ trợ, hoặc kết nối tới Google Drive bị gián đoạn.');
+  }
+});
+
 function saveCurrentProgress() {
   if (!currentVideo || !videoPlayer.duration) return;
   if (videoPlayer.currentTime < 3 || videoPlayer.currentTime > videoPlayer.duration - 2) {
@@ -743,6 +840,7 @@ function closePlayer() {
   videoPlayer.pause();
   videoPlayer.removeAttribute('src');
   clearSubtitle();
+  hidePlayerError();
   videoPlayer.load();
   currentVideo = null;
   showScreen('grid');
