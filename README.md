@@ -139,23 +139,17 @@ Giao diện đã được làm lại đầy đủ hơn:
   Drive (hoặc qua extension) — trang web chỉ đọc, không có quyền ghi.
 
 
-## Quy trình thêm tài khoản + lấy API Key ngay trong app
+## Quy trình thêm Google Account mới
 
-Khi vào `⚙️ → + Thêm tài khoản`, app không còn chỉ nói “hãy lấy API Key” chung chung.
+`⚙️ → + Thêm tài khoản` mở wizard 6 bước:
 
-- Nếu dòng trước đã có API Key: app **tự sao chép Key** sang dòng mới.
-- Nếu dòng mới chưa có Key: app **tự mở quy trình 1 → 5** trong màn hình cấu hình.
-- Bước nào cần thao tác bên ngoài app đều có nút mở **đúng trang Google Cloud**.
-- Sau khi dán/tạo Key, app kiểm tra folder ngay bằng `🔍 Kiểm tra folder này`.
-- Chỉ khi kiểm tra OK mới cần `Lưu cấu hình`.
+1. Nhập **Google Account mới**.
+2. Mở Google Cloud và **tạo/chọn Project bằng chính account mới**.
+3. Bật **Google Drive API** trong Project đó.
+4. Tạo **API Key** trong Credentials của Project đó và dán vào wizard.
+5. Nhập folder Drive của account mới và bấm **Kiểm tra folder**.
+6. Xem lại thông tin → **Thêm account này vào app**.
 
-### 5 bước trong app
+App không copy API Key của account cũ. Mỗi account có cấu hình `googleAccount + apiKey + folderLink` riêng.
 
-1. **Project** — nếu đã có Project đang dùng thì bỏ qua; nếu chưa có, mở trang tạo Project.
-2. **Google Drive API** — mở Google Drive API và bấm Enable nếu chưa bật.
-3. **Credentials** — mở Credentials → Create credentials → API key.
-4. **Đưa Key vào dòng tài khoản mới** — dán Key hoặc bấm “Dùng API Key của tài khoản trước”.
-5. **Kiểm tra folder** — nhập tên + link folder → kiểm tra → lưu.
-
-> Google không cho một trang GitHub Pages tự đăng nhập và tự tạo API Key thay người dùng. Vì vậy phần duy nhất bắt buộc thao tác trên Google Cloud là xác nhận Project/API/Key. App đã tối đa hóa phần còn lại bằng link đúng trang, tự điền Key, kiểm tra folder và báo lỗi tại chỗ.
-
+Google không cho GitHub Pages tự đăng nhập và tự tạo Project/API Key thay người dùng; vì vậy các thao tác xác nhận/tạo trên Google Cloud vẫn cần người dùng thực hiện, nhưng app mở đúng trang và dẫn theo thứ tự.

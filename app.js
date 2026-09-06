@@ -62,12 +62,6 @@ const accountsListEl = document.getElementById('accountsList');
 const addAccountBtn = document.getElementById('addAccountBtn');
 const saveBtn = document.getElementById('saveBtn');
 const settingsError = document.getElementById('settingsError');
-const apiKeyGuide = document.getElementById('apiKeyGuide');
-const closeApiGuideBtn = document.getElementById('closeApiGuideBtn');
-const apiProjectBtn = document.getElementById('apiProjectBtn');
-const apiLibraryBtn = document.getElementById('apiLibraryBtn');
-const apiCredentialsBtn = document.getElementById('apiCredentialsBtn');
-const usePreviousKeyBtn = document.getElementById('usePreviousKeyBtn');
 
 const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
@@ -579,65 +573,174 @@ function showScreen(name) {
 
 let accountDraftRows = []; // [{label, apiKey, folderLink}] đang chỉnh trong modal, chưa lưu
 
-// ---------------- Quy trình lấy API Key ngay trong app ----------------
-let apiGuideRowIndex = -1;
 
-function openExternal(url) {
-  window.open(url, '_blank', 'noopener,noreferrer');
+// ================= ACCOUNT SETUP WIZARD =================
+const accountWizard = document.getElementById('accountWizard');
+const closeAccountWizardBtn = document.getElementById('closeAccountWizardBtn');
+const wizardGoogleAccount = document.getElementById('wizardGoogleAccount');
+const wizardAccountLabel = document.getElementById('wizardAccountLabel');
+const wizardFolderAccountLabel = document.getElementById('wizardFolderAccountLabel');
+const wizardApiKey = document.getElementById('wizardApiKey');
+const wizardApiStatus = document.getElementById('wizardApiStatus');
+const wizardFolderLink = document.getElementById('wizardFolderLink');
+const wizardAccountLabelInput = document.getElementById('wizardAccountLabelInput');
+const wizardFolderStatus = document.getElementById('wizardFolderStatus');
+const wizardStep5Next = document.getElementById('wizardStep5Next');
+const wizardSummary = document.getElementById('wizardSummary');
+
+let accountWizardStep = 1;
+let accountWizardData = {
+  googleAccount: '',
+  label: '',
+  apiKey: '',
+  folderLink: '',
+  folderOk: false,
+  videoCount: 0
+};
+
+function wizardShowStep(step) {
+  accountWizardStep = step;
+  accountWizard.querySelectorAll('.wizard-panel').forEach(function(p) {
+    p.classList.toggle('hidden', Number(p.dataset.panel) !== step);
+  });
+  accountWizard.querySelectorAll('[data-wstep]').forEach(function(p) {
+    const n = Number(p.dataset.wstep);
+    p.classList.toggle('active', n === step);
+    p.classList.toggle('done', n < step);
+  });
 }
 
-function showApiKeyGuide(rowIndex) {
-  apiGuideRowIndex = Number(rowIndex);
-  if (!apiKeyGuide) return;
-  apiKeyGuide.classList.remove('hidden');
-  const row = accountDraftRows[apiGuideRowIndex];
-  const hasPrevious = apiGuideRowIndex > 0 && accountDraftRows
-    .slice(0, apiGuideRowIndex)
-    .some(function (r) { return (r.apiKey || '').trim(); });
-  if (usePreviousKeyBtn) {
-    usePreviousKeyBtn.disabled = !hasPrevious;
-    usePreviousKeyBtn.textContent = hasPrevious
-      ? '⚡ Dùng API Key của tài khoản trước'
-      : '⚠ Chưa có API Key ở tài khoản trước';
-  }
-  if (row && (row.apiKey || '').trim()) {
-    const box = apiKeyGuide.querySelector('.api-guide-note');
-    if (box) box.innerHTML = '<b>✓ Dòng này đã có API Key.</b> Bạn có thể bỏ qua bước 1–3, chỉ cần nhập link folder, kiểm tra và lưu.';
-  }
-  apiKeyGuide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+function openAccountWizard() {
+  accountWizardData = { googleAccount:'', label:'', apiKey:'', folderLink:'', folderOk:false, videoCount:0 };
+  wizardGoogleAccount.value = '';
+  wizardApiKey.value = '';
+  wizardAccountLabelInput.value = '';
+  wizardFolderLink.value = '';
+  wizardApiStatus.textContent = '';
+  wizardFolderStatus.textContent = '';
+  wizardStep5Next.disabled = true;
+  wizardShowStep(1);
+  accountWizard.classList.remove('hidden');
+  wizardGoogleAccount.focus();
+  accountWizard.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
-function closeApiKeyGuide() {
-  if (apiKeyGuide) apiKeyGuide.classList.add('hidden');
-  apiGuideRowIndex = -1;
+function closeAccountWizard() {
+  accountWizard.classList.add('hidden');
 }
 
-if (closeApiGuideBtn) closeApiGuideBtn.addEventListener('click', closeApiKeyGuide);
-if (apiProjectBtn) apiProjectBtn.addEventListener('click', function () {
-  openExternal('https://console.cloud.google.com/projectcreate');
-});
-if (apiLibraryBtn) apiLibraryBtn.addEventListener('click', function () {
-  openExternal('https://console.cloud.google.com/apis/library/drive.googleapis.com');
-});
-if (apiCredentialsBtn) apiCredentialsBtn.addEventListener('click', function () {
-  openExternal('https://console.cloud.google.com/apis/credentials');
-});
-if (usePreviousKeyBtn) usePreviousKeyBtn.addEventListener('click', function () {
-  if (apiGuideRowIndex < 0 || !accountDraftRows[apiGuideRowIndex]) return;
-  let sourceKey = '';
-  for (let i = apiGuideRowIndex - 1; i >= 0; i--) {
-    sourceKey = (accountDraftRows[i].apiKey || '').trim();
-    if (sourceKey) break;
+document.getElementById('addAccountBtn')?.addEventListener('click', openAccountWizard);
+closeAccountWizardBtn?.addEventListener('click', closeAccountWizard);
+
+document.getElementById('wizardStep1Next')?.addEventListener('click', function() {
+  const email = wizardGoogleAccount.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert('Vui lòng nhập đúng Google Account/Gmail của tài khoản mới.');
+    return;
   }
-  if (!sourceKey) return;
-  accountDraftRows[apiGuideRowIndex].apiKey = sourceKey;
+  accountWizardData.googleAccount = email;
+  wizardAccountLabel.textContent = email;
+  wizardFolderAccountLabel.textContent = email;
+  wizardShowStep(2);
+});
+
+document.getElementById('wizardCloudBtn')?.addEventListener('click', function() {
+  window.open('https://console.cloud.google.com/', '_blank', 'noopener,noreferrer');
+});
+document.getElementById('wizardProjectBtn')?.addEventListener('click', function() {
+  window.open('https://console.cloud.google.com/projectcreate', '_blank', 'noopener,noreferrer');
+});
+document.getElementById('wizardStep2Next')?.addEventListener('click', function() {
+  if (!document.getElementById('wizardProjectDone').checked) {
+    alert('Hãy xác nhận bạn đã chọn/tạo Project bằng Google Account mới.');
+    return;
+  }
+  wizardShowStep(3);
+});
+document.getElementById('wizardDriveApiBtn')?.addEventListener('click', function() {
+  window.open('https://console.cloud.google.com/apis/library/drive.googleapis.com', '_blank', 'noopener,noreferrer');
+});
+document.getElementById('wizardStep3Next')?.addEventListener('click', function() {
+  if (!document.getElementById('wizardDriveApiDone').checked) {
+    alert('Hãy xác nhận Google Drive API đã được bật.');
+    return;
+  }
+  wizardShowStep(4);
+});
+document.getElementById('wizardCredentialsBtn')?.addEventListener('click', function() {
+  window.open('https://console.cloud.google.com/apis/credentials', '_blank', 'noopener,noreferrer');
+});
+document.getElementById('wizardStep4Next')?.addEventListener('click', function() {
+  const key = wizardApiKey.value.trim();
+  if (!key || key.length < 20) {
+    wizardApiStatus.textContent = '⚠ API Key chưa được nhập đầy đủ.';
+    return;
+  }
+  accountWizardData.apiKey = key;
+  wizardApiStatus.textContent = '✓ Đã nhận API Key. Key này sẽ được lưu riêng cho ' + accountWizardData.googleAccount + '.';
+  wizardShowStep(5);
+});
+
+document.getElementById('wizardCheckFolderBtn')?.addEventListener('click', async function() {
+  const label = wizardAccountLabelInput.value.trim();
+  const folder = wizardFolderLink.value.trim();
+  if (!label) {
+    wizardFolderStatus.textContent = '⚠ Hãy nhập tên hiển thị cho account.';
+    return;
+  }
+  if (!folder) {
+    wizardFolderStatus.textContent = '⚠ Hãy nhập link folder Google Drive.';
+    return;
+  }
+  wizardFolderStatus.textContent = '⏳ Đang kiểm tra folder...';
+  wizardStep5Next.disabled = true;
+
+  try {
+    // Dùng đúng hàm quét folder hiện có trong app.
+    // Không lưu account cho tới khi kiểm tra thành công.
+    const result = await fetchFolderVideos(accountWizardData.apiKey, folder);
+    const count = Array.isArray(result) ? result.length : (result?.videos?.length || 0);
+    accountWizardData.label = label;
+    accountWizardData.folderLink = folder;
+    accountWizardData.folderOk = true;
+    accountWizardData.videoCount = count;
+    wizardFolderStatus.textContent = '✓ OK — tìm thấy ' + count + ' video trong folder.';
+    wizardStep5Next.disabled = false;
+  } catch (err) {
+    wizardFolderStatus.textContent = '✗ Không quét được folder: ' + (err?.message || String(err));
+  }
+});
+
+document.getElementById('wizardStep5Next')?.addEventListener('click', function() {
+  if (!accountWizardData.folderOk) return;
+  wizardSummary.innerHTML =
+    '<div><b>Google Account:</b> ' + escapeHtml(accountWizardData.googleAccount) + '</div>' +
+    '<div><b>Tên:</b> ' + escapeHtml(accountWizardData.label) + '</div>' +
+    '<div><b>API Key:</b> ' + escapeHtml(accountWizardData.apiKey.slice(0,8)) + '••••••••</div>' +
+    '<div><b>Folder:</b> ' + escapeHtml(accountWizardData.folderLink) + '</div>' +
+    '<div><b>Video tìm thấy:</b> ' + accountWizardData.videoCount + '</div>';
+  wizardShowStep(6);
+});
+
+document.getElementById('wizardFinishBtn')?.addEventListener('click', function() {
+  accountDraftRows.push({
+    label: accountWizardData.label,
+    googleAccount: accountWizardData.googleAccount,
+    apiKey: accountWizardData.apiKey,
+    folderLink: accountWizardData.folderLink
+  });
   renderAccountRows();
-  showApiKeyGuide(apiGuideRowIndex);
-  const rowEls = accountsListEl.querySelectorAll('.account-row');
-  const rowEl = rowEls[apiGuideRowIndex];
-  const inputs = rowEl ? rowEl.querySelectorAll('input[type="text"]') : [];
-  if (inputs[1]) inputs[1].focus();
+  closeAccountWizard();
+  if (typeof settingsStatus !== 'undefined' && settingsStatus) {
+    settingsStatus.textContent = '✓ Đã thêm ' + accountWizardData.googleAccount + '. Bấm Lưu cấu hình để áp dụng.';
+  }
 });
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, function(ch) {
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]);
+  });
+}
 
 function renderAccountRows() {
   accountsListEl.innerHTML = '';
@@ -715,18 +818,6 @@ function renderAccountRows() {
     });
 
     checkRow.appendChild(checkBtn);
-
-    const guideBtn = document.createElement('button');
-    guideBtn.type = 'button';
-    guideBtn.className = 'btn account-guide-btn';
-    guideBtn.textContent = '🧭 Hướng dẫn lấy API Key';
-    guideBtn.title = 'Quy trình từng bước lấy API Key';
-    guideBtn.setAttribute('tabindex', '0');
-    guideBtn.addEventListener('click', function () {
-      showApiKeyGuide(idx);
-    });
-
-    checkRow.appendChild(guideBtn);
     checkRow.appendChild(checkStatus);
 
     const removeBtn = document.createElement('button');
@@ -787,13 +878,6 @@ if (addAccountBtn) {
     // Focus vào ô "Tên gợi nhớ" (ô đầu tiên) của dòng mới, vì API Key
     // đã tự điền sẵn rồi - chỉ cần gõ tên + dán link folder.
     if (inputs[0]) inputs[0].focus();
-
-    // Nếu đã có Key ở dòng trước, dòng mới đã được điền tự động.
-    // Hiện hướng dẫn chỉ khi thực sự chưa có Key, để người dùng biết ngay phải làm gì.
-    const newRow = accountDraftRows[accountDraftRows.length - 1];
-    if (!newRow.apiKey) {
-      showApiKeyGuide(accountDraftRows.length - 1);
-    }
   });
 }
 

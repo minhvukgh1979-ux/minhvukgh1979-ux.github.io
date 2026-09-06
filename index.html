@@ -95,69 +95,82 @@
       <div id="accountsList" class="accounts-list"></div>
 
       <button id="addAccountBtn" class="btn" type="button" tabindex="0">+ Thêm tài khoản</button>
-
-      <div id="apiKeyGuide" class="api-key-guide hidden">
-        <div class="api-guide-head">
+      <div id="accountWizard" class="account-wizard hidden">
+        <div class="wizard-head">
           <div>
-            <strong>🧭 Quy trình lấy Google Drive API Key ngay trong app</strong>
-            <div class="api-guide-sub">App không thể tự bấm tạo Key trong Google Cloud vì Google yêu cầu tài khoản của bạn xác nhận quyền. App sẽ làm phần còn lại tối đa: mở đúng trang, hướng dẫn đúng nút, tự nhận/dán Key và kiểm tra ngay.</div>
+            <strong>➕ Thêm Google Account mới</strong>
+            <div class="wizard-sub">Quy trình này tạo cấu hình riêng cho chính Google Account mới. API Key sẽ lấy từ Google Cloud Project của account đó, không dùng Key của account khác.</div>
           </div>
-          <button id="closeApiGuideBtn" class="btn api-guide-close" type="button">Đóng hướng dẫn</button>
+          <button id="closeAccountWizardBtn" class="btn" type="button">Đóng</button>
         </div>
 
-        <div class="api-step" data-api-step="1">
-          <div class="api-step-no">1</div>
-          <div class="api-step-body">
-            <strong>Mở Google Cloud Console</strong>
-            <p>Nếu bạn đã có Project dùng cho API Key hiện tại thì <b>không cần tạo Project mới</b>; bỏ qua bước này.</p>
-            <button id="apiProjectBtn" class="btn api-link-btn" type="button">↗ Mở trang tạo Project</button>
-            <label class="api-done"><input type="checkbox"> Tôi đã có/chọn Project</label>
-          </div>
+        <div class="wizard-progress">
+          <span data-wstep="1">1. Account</span>
+          <span data-wstep="2">2. Project</span>
+          <span data-wstep="3">3. Drive API</span>
+          <span data-wstep="4">4. API Key</span>
+          <span data-wstep="5">5. Folder</span>
+          <span data-wstep="6">6. Hoàn tất</span>
         </div>
 
-        <div class="api-step" data-api-step="2">
-          <div class="api-step-no">2</div>
-          <div class="api-step-body">
-            <strong>Bật Google Drive API</strong>
-            <p>Trong Project đang dùng, mở Google Drive API và bấm <b>Enable / Bật</b> nếu chưa bật.</p>
-            <button id="apiLibraryBtn" class="btn api-link-btn" type="button">↗ Mở Google Drive API</button>
-            <label class="api-done"><input type="checkbox"> Tôi đã bật Google Drive API</label>
-          </div>
+        <div class="wizard-panel" data-panel="1">
+          <div class="wizard-number">1</div>
+          <h3>Nhập Google Account mới</h3>
+          <p>Nhập Gmail/Google Account mà bạn muốn dùng cho nguồn phim mới.</p>
+          <input id="wizardGoogleAccount" type="email" placeholder="ví dụ: minhvukgh1977@gmail.com" autocomplete="email">
+          <button id="wizardStep1Next" class="btn btn-primary" type="button">Tiếp tục →</button>
+          <div class="wizard-note">⚠ Đây là account sẽ được dùng để tạo/chọn Google Cloud Project và API Key ở các bước sau.</div>
         </div>
 
-        <div class="api-step" data-api-step="3">
-          <div class="api-step-no">3</div>
-          <div class="api-step-body">
-            <strong>Tạo API Key</strong>
-            <p>Mở Credentials → <b>Create credentials</b> → <b>API key</b>. Google sẽ hiện chuỗi bắt đầu bằng <code>AIza...</code>.</p>
-            <button id="apiCredentialsBtn" class="btn api-link-btn" type="button">↗ Mở Credentials</button>
-            <label class="api-done"><input type="checkbox"> Tôi đã tạo API Key</label>
-          </div>
+        <div class="wizard-panel hidden" data-panel="2">
+          <div class="wizard-number">2</div>
+          <h3>Mở Google Cloud bằng account mới</h3>
+          <p>Hãy chắc chắn trình duyệt đang đăng nhập đúng: <b id="wizardAccountLabel"></b>.</p>
+          <button id="wizardCloudBtn" class="btn api-link-btn" type="button">↗ Mở Google Cloud</button>
+          <button id="wizardProjectBtn" class="btn api-link-btn" type="button">↗ Tạo Project mới</button>
+          <label class="wizard-check"><input id="wizardProjectDone" type="checkbox"> Tôi đã chọn/tạo Project bằng account mới</label>
+          <button id="wizardStep2Next" class="btn btn-primary" type="button">Tiếp tục →</button>
         </div>
 
-        <div class="api-step" data-api-step="4">
-          <div class="api-step-no">4</div>
-          <div class="api-step-body">
-            <strong>Đưa Key vào tài khoản mới</strong>
-            <p>Quay lại dòng tài khoản đang thêm. Dán Key vào ô <b>Google Drive API Key</b>. Nếu app có Key ở tài khoản trước, bấm nút <b>Dùng Key trước</b> để tự điền, không cần tạo Key mới.</p>
-            <button id="usePreviousKeyBtn" class="btn btn-primary" type="button">⚡ Dùng API Key của tài khoản trước</button>
-            <label class="api-done"><input type="checkbox"> Tôi đã đưa Key vào dòng tài khoản mới</label>
-          </div>
+        <div class="wizard-panel hidden" data-panel="3">
+          <div class="wizard-number">3</div>
+          <h3>Bật Google Drive API</h3>
+          <p>Trong Project vừa tạo/chọn, mở Google Drive API và bấm <b>Enable</b> nếu Google yêu cầu.</p>
+          <button id="wizardDriveApiBtn" class="btn api-link-btn" type="button">↗ Mở Google Drive API</button>
+          <label class="wizard-check"><input id="wizardDriveApiDone" type="checkbox"> Tôi đã bật Google Drive API cho Project này</label>
+          <button id="wizardStep3Next" class="btn btn-primary" type="button">Tiếp tục →</button>
         </div>
 
-        <div class="api-step" data-api-step="5">
-          <div class="api-step-no">5</div>
-          <div class="api-step-body">
-            <strong>Kiểm tra và hoàn tất</strong>
-            <p>Nhập <b>tên tài khoản</b> + <b>link folder Drive</b>, rồi bấm <b>🔍 Kiểm tra folder này</b>. Nếu hiện “✓ OK” thì bấm <b>Lưu cấu hình</b>.</p>
-            <label class="api-done"><input type="checkbox"> Tôi đã kiểm tra folder và sẵn sàng lưu</label>
-          </div>
+        <div class="wizard-panel hidden" data-panel="4">
+          <div class="wizard-number">4</div>
+          <h3>Tạo API Key cho Project của account mới</h3>
+          <p>Mở Credentials → Create credentials → API key. Sau khi Google hiện Key, copy Key đó.</p>
+          <button id="wizardCredentialsBtn" class="btn api-link-btn" type="button">↗ Mở Credentials</button>
+          <input id="wizardApiKey" type="text" placeholder="Dán API Key mới, ví dụ AIza..." autocomplete="off" spellcheck="false">
+          <button id="wizardStep4Next" class="btn btn-primary" type="button">Kiểm tra Key →</button>
+          <div id="wizardApiStatus" class="wizard-status"></div>
+          <div class="wizard-note">🔐 App không thể tự tạo API Key trong Google Cloud thay bạn. Bạn chỉ cần thực hiện thao tác Create credentials và dán Key vào đây.</div>
         </div>
 
-        <div class="api-guide-note">
-          <b>💡 Quan trọng:</b> API Key không gắn riêng với Gmail/Drive. Một Key của Google Cloud Project có thể dùng cho nhiều folder/tài khoản Drive. Bạn chỉ cần tạo Key mới khi muốn tách Project/Key. App <b>không thể tự tạo Key thay bạn</b> vì thao tác này nằm trong Google Cloud và cần quyền đăng nhập của bạn.
+        <div class="wizard-panel hidden" data-panel="5">
+          <div class="wizard-number">5</div>
+          <h3>Gắn Folder Drive của account mới</h3>
+          <p>Folder nên nằm trên Drive của <b id="wizardFolderAccountLabel"></b> và chia sẻ <b>Bất kỳ ai có đường liên kết → Người xem</b>.</p>
+          <input id="wizardAccountLabelInput" type="text" placeholder="Tên hiển thị, ví dụ Account 1977">
+          <input id="wizardFolderLink" type="url" placeholder="https://drive.google.com/drive/folders/...">
+          <button id="wizardCheckFolderBtn" class="btn api-link-btn" type="button">🔍 Kiểm tra folder</button>
+          <div id="wizardFolderStatus" class="wizard-status"></div>
+          <button id="wizardStep5Next" class="btn btn-primary" type="button" disabled>Tiếp tục →</button>
+        </div>
+
+        <div class="wizard-panel hidden" data-panel="6">
+          <div class="wizard-number">✓</div>
+          <h3>Hoàn tất account mới</h3>
+          <div id="wizardSummary" class="wizard-summary"></div>
+          <button id="wizardFinishBtn" class="btn btn-primary" type="button">✓ Thêm account này vào app</button>
         </div>
       </div>
+
 
       <div class="settings-actions">
         <button id="saveBtn" class="btn btn-primary" tabindex="0">Lưu cấu hình</button>
@@ -165,13 +178,12 @@
       </div>
 
       <p class="hint">
-        <b>Quy trình thêm tài khoản:</b> bấm <b>+ Thêm tài khoản</b> →
-        app tự sao chép API Key từ dòng trước nếu có → nhập tên + link folder →
-        bấm <b>🔍 Kiểm tra folder này</b> → <b>Lưu cấu hình</b>.
-        Nếu chưa có API Key, bấm <b>🧭 Hướng dẫn lấy API Key</b> trong dòng mới
-        để làm theo từng bước 1→5 ngay trong app. Mỗi folder phải chia sẻ
-        "Bất kỳ ai có đường liên kết - Người xem". Các tài khoản dự phòng nên
-        có video CÙNG TÊN file. Phụ đề .srt cùng tên video sẽ tự động được gắn.
+        Mỗi folder phải để chia sẻ "Bất kỳ ai có đường liên kết - Người
+        xem". Muốn tính năng dự phòng hoạt động, các tài khoản nên chứa
+        video CÙNG TÊN file (không cần y hệt 100%, chỉ cần trùng phần
+        tên trước đuôi mở rộng). Nếu có file phụ đề (.srt) cùng tên với
+        video, phụ đề sẽ tự động gắn vào khi phát. Bấm phím <b>M</b> bất
+        cứ lúc nào để mở lại màn hình này.
       </p>
       <p id="settingsError" class="error"></p>
     </div>
