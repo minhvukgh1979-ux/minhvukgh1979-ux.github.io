@@ -173,6 +173,37 @@
 
 
 
+
+      <div class="oauth-setup-box">
+        <div class="shared-config-title">🔐 Cấu hình Google OAuth Client ID — làm 1 lần cho máy này</div>
+        <div class="shared-config-help">
+          OAuth dùng để cho phép app <b>đọc và ghi app-config.json</b> trên Google Drive.
+          API Key <b>không có quyền ghi Drive</b>, nên đây là bước bắt buộc nếu muốn đồng bộ nhiều máy.
+        </div>
+        <div class="oauth-steps">
+          <div><b>1.</b> Đăng nhập Google Cloud bằng đúng Google Account bạn muốn quản lý cấu hình.</div>
+          <div><b>2.</b> Chọn đúng Project đang dùng cho app.</div>
+          <div><b>3.</b> Mở <b>APIs & Services → OAuth consent screen</b> và tạo/cấu hình consent screen nếu chưa có.</div>
+          <div><b>4.</b> Mở <b>APIs & Services → Credentials → Create credentials → OAuth client ID</b>.</div>
+          <div><b>5.</b> Chọn <b>Web application</b>.</div>
+          <div><b>6.</b> Ở <b>Authorized JavaScript origins</b>, thêm đúng địa chỉ GitHub Pages của bạn, ví dụ:
+            <code>https://minhvukgh1979-ux.github.io</code>.</div>
+          <div><b>7.</b> Bấm <b>Create</b> → copy <b>Client ID</b> (chuỗi kết thúc bằng <code>.apps.googleusercontent.com</code>).</div>
+          <div><b>8.</b> Dán Client ID vào ô bên dưới và bấm <b>Lưu Client ID</b>.</div>
+        </div>
+        <div class="oauth-links">
+          <button id="oauthConsoleBtn" class="btn" type="button">↗ Google Cloud Console</button>
+          <button id="oauthConsentBtn" class="btn" type="button">↗ OAuth Consent Screen</button>
+          <button id="oauthCredentialsBtn" class="btn" type="button">↗ Credentials</button>
+        </div>
+        <div class="shared-config-row">
+          <input id="googleClientIdInput" type="text" placeholder="Ví dụ: 123456789012-abc...apps.googleusercontent.com">
+          <button id="saveGoogleClientIdBtn" class="btn btn-primary" type="button">💾 Lưu Client ID</button>
+          <button id="testGoogleOAuthBtn" class="btn" type="button">🔐 Thử đăng nhập Google</button>
+        </div>
+        <div id="googleOAuthStatus" class="shared-config-status"></div>
+      </div>
+
       <div class="shared-config-box">
         <div class="shared-config-title">☁️ Đồng bộ cấu hình chung qua Google Drive</div>
         <div class="shared-config-help">

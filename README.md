@@ -176,3 +176,89 @@ App hỗ trợ file `app-config.json` nằm trong một folder Drive dùng chung
 Google Drive API Key không có quyền sửa file Drive. Muốn app tự tạo/cập nhật `app-config.json`, người dùng phải cấp OAuth token với quyền Drive. Không có cách an toàn để GitHub Pages tự ghi Drive chỉ bằng API Key.
 
 **Cảnh báo:** nếu `app-config.json` nằm trong folder mà nhiều người có thể đọc, API Key cũng sẽ nằm trong đó. Chỉ dùng folder cấu hình cho những người bạn tin cậy; tốt nhất không chia sẻ file cấu hình cho người ngoài.
+
+
+# Hướng dẫn Google OAuth Client ID (chi tiết)
+
+## Mục đích
+
+API Key chỉ phục vụ các request API có API key; nó **không cấp quyền cho website sửa file trên Google Drive**. Để app có thể tạo/cập nhật `app-config.json`, người dùng phải cấp OAuth.
+
+## Làm lần đầu trên mỗi máy
+
+### Bước 1 — Mở Google Cloud
+Trong app: `⚙️ → 🔐 Cấu hình Google OAuth Client ID` → bấm **Google Cloud Console**.
+
+Đăng nhập Google Account có quyền với Project bạn dùng.
+
+### Bước 2 — Chọn Project
+Trên Google Cloud Console, chọn đúng Project. Nếu chưa có Project thì tạo Project trước.
+
+### Bước 3 — Bật Google Drive API
+Vào **APIs & Services → Library → Google Drive API → Enable**.
+
+### Bước 4 — Cấu hình OAuth consent screen
+Vào **APIs & Services → OAuth consent screen**.
+
+Nếu Google yêu cầu, tạo/cấu hình màn hình xin quyền. Chọn loại User Type phù hợp với tài khoản của bạn. Với app cá nhân/testing, có thể để chế độ test và thêm tài khoản dùng thử nếu Google yêu cầu.
+
+Khi cấu hình scopes, app cần quyền Drive để đọc/ghi `app-config.json`. App sử dụng scope:
+`https://www.googleapis.com/auth/drive`
+
+### Bước 5 — Tạo OAuth Client ID
+Vào **APIs & Services → Credentials → Create credentials → OAuth client ID**.
+
+Chọn:
+**Application type → Web application**
+
+### Bước 6 — Thêm Authorized JavaScript origins
+Trong OAuth Client, tại **Authorized JavaScript origins**, thêm chính domain GitHub Pages.
+
+Ví dụ:
+`https://minhvukgh1979-ux.github.io`
+
+Không thêm dấu `/` ở cuối.
+
+Nếu bạn dùng domain riêng thì thêm domain đó.
+
+### Bước 7 — Tạo và copy Client ID
+Bấm **Create**.
+
+Google sẽ cấp một Client ID dạng:
+`123456789012-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com`
+
+Copy toàn bộ chuỗi.
+
+### Bước 8 — Đưa Client ID vào app
+Trong app:
+`⚙️ → 🔐 Cấu hình Google OAuth Client ID`
+
+Dán Client ID → **💾 Lưu Client ID**.
+
+### Bước 9 — Kiểm tra OAuth
+Bấm **🔐 Thử đăng nhập Google**.
+
+Google sẽ hiện cửa sổ xin quyền. Chọn đúng Google Account và đồng ý quyền Drive.
+
+Nếu thành công, app báo:
+`✓ OAuth thành công`
+
+### Bước 10 — Lưu cấu hình chung
+Sau khi OAuth thành công:
+1. Dán link folder dùng làm folder cấu hình chung.
+2. Bấm **☁️ Lưu cấu hình chung**.
+3. App tạo/cập nhật `app-config.json`.
+
+Máy khác chỉ cần:
+1. Cấu hình OAuth Client ID cho domain đó.
+2. Đăng nhập Google.
+3. Dán cùng link folder cấu hình.
+4. Bấm **☁️ Đọc cấu hình**.
+
+## Quan trọng về account mới
+
+OAuth Client ID có thể được dùng bởi app trên cùng domain. Việc **account nào được cấp quyền** là do Google OAuth login. Khi thêm account phim mới, vẫn phải dùng đúng Google Account đó cho Cloud Project/API Key/Drive theo quy trình trong wizard.
+
+## Lưu ý bảo mật
+
+`app-config.json` chứa API Key theo yêu cầu của thiết kế hiện tại. Không đặt file này trong folder công khai cho người lạ. OAuth token không được ghi vào `app-config.json`.

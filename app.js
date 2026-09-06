@@ -124,6 +124,50 @@ function migrateOldConfigIfNeeded() {
 }
 
 
+
+// ================= GOOGLE OAUTH SETUP UI =================
+function initGoogleOAuthSetupUI() {
+  const input = document.getElementById('googleClientIdInput');
+  const saveBtn = document.getElementById('saveGoogleClientIdBtn');
+  const testBtn = document.getElementById('testGoogleOAuthBtn');
+  const status = document.getElementById('googleOAuthStatus');
+  if (!input || !status) return;
+
+  input.value = getGoogleClientId();
+
+  document.getElementById('oauthConsoleBtn')?.addEventListener('click', function() {
+    window.open('https://console.cloud.google.com/', '_blank', 'noopener,noreferrer');
+  });
+  document.getElementById('oauthConsentBtn')?.addEventListener('click', function() {
+    window.open('https://console.cloud.google.com/apis/credentials/consent', '_blank', 'noopener,noreferrer');
+  });
+  document.getElementById('oauthCredentialsBtn')?.addEventListener('click', function() {
+    window.open('https://console.cloud.google.com/apis/credentials', '_blank', 'noopener,noreferrer');
+  });
+
+  saveBtn?.addEventListener('click', function() {
+    const id = input.value.trim();
+    if (!id || !id.includes('.apps.googleusercontent.com')) {
+      status.textContent = '⚠ Client ID không đúng định dạng. Hãy dán OAuth Client ID kết thúc bằng .apps.googleusercontent.com';
+      return;
+    }
+    setGoogleClientId(id);
+    status.textContent = '✓ Đã lưu OAuth Client ID trên máy này.';
+  });
+
+  testBtn?.addEventListener('click', async function() {
+    try {
+      status.textContent = '⏳ Đang mở đăng nhập Google...';
+      await requestDriveOAuthToken();
+      status.textContent = '✓ OAuth thành công. Máy này đã được cấp quyền Google Drive cho app.';
+    } catch (e) {
+      status.textContent = '✗ OAuth chưa thành công: ' + (e.message || String(e));
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initGoogleOAuthSetupUI);
+
 // ================= SHARED DRIVE CONFIG =================
 // File dùng chung trong folder Drive: app-config.json
 const SHARED_CONFIG_FILE_NAME = 'app-config.json';
