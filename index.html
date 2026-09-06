@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dethi Drive TV</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ==================== MÀN HÌNH DANH SÁCH ==================== -->
+  <div id="gridScreen" class="screen hidden">
+    <header class="topbar">
+      <h1 class="page-title">📺 Dethi Drive TV</h1>
+      <button id="settingsBtn" class="icon-btn" tabindex="0" title="Cấu hình (phím M)">⚙️</button>
+    </header>
+
+    <div class="toolbar">
+      <div class="search-row">
+        <input id="searchInput" type="text" tabindex="0" placeholder="🔍 Tìm video theo tên..." />
+      </div>
+      <select id="sortSelect" tabindex="0">
+        <option value="name">Tên A → Z</option>
+        <option value="newest">Mới thêm gần đây</option>
+        <option value="favorite">Yêu thích trước</option>
+      </select>
+      <button id="refreshBtn" class="btn" tabindex="0">↻ Tải lại</button>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="all" tabindex="0">Tất cả</button>
+      <button class="tab" data-tab="favorite" tabindex="0">★ Yêu thích</button>
+      <button class="tab" data-tab="hidden" tabindex="0">🙈 Đã ẩn</button>
+    </div>
+
+    <p id="statusMsg" class="status"></p>
+    <div id="videoGrid" class="grid"></div>
+  </div>
+
+  <!-- ==================== MÀN HÌNH PHÁT VIDEO ==================== -->
+  <div id="playerScreen" class="screen hidden">
+    <div id="playerWrap" class="player-wrap">
+      <video id="videoPlayer" playsinline>
+        <track id="subtitleTrack" kind="subtitles" srclang="vi" label="Phụ đề" default>
+      </video>
+
+      <button id="bigPlayBtn" class="big-play-btn" tabindex="0" title="Phát/Tạm dừng">▶</button>
+
+      <div id="playerControls" class="player-controls">
+        <div class="pc-top">
+          <button id="backBtn" class="icon-btn" tabindex="0" title="Quay lại (Esc)">←</button>
+          <span id="playerTitle" class="player-title"></span>
+        </div>
+
+        <div class="pc-seek-row">
+          <span id="timeCurrent" class="time">0:00</span>
+          <input id="seekBar" type="range" min="0" max="1000" value="0" step="0.1" tabindex="0" />
+          <span id="timeDuration" class="time">0:00</span>
+        </div>
+
+        <div class="pc-buttons-row">
+          <div class="pc-left">
+            <button id="playPauseBtn" class="icon-btn" tabindex="0" title="Phát/Tạm dừng (Space)">▶</button>
+            <button id="rewindBtn" class="icon-btn" tabindex="0" title="Lùi 10s (←)">⏪10</button>
+            <button id="forwardBtn" class="icon-btn" tabindex="0" title="Tiến 10s (→)">10⏩</button>
+            <button id="muteBtn" class="icon-btn" tabindex="0" title="Tắt/Bật tiếng (M)">🔊</button>
+            <input id="volumeBar" type="range" min="0" max="1" value="1" step="0.05" tabindex="0" />
+          </div>
+          <div class="pc-right">
+            <button id="subtitleBtn" class="icon-btn hidden" tabindex="0" title="Bật/Tắt phụ đề (C)">CC</button>
+            <button id="speedBtn" class="icon-btn" tabindex="0" title="Tốc độ phát">1x</button>
+            <button id="fullscreenBtn" class="icon-btn" tabindex="0" title="Toàn màn hình (F)">⛶</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL CẤU HÌNH ==================== -->
+  <div id="settingsScreen" class="modal-overlay hidden">
+    <div class="settings-box">
+      <h1>Cấu hình</h1>
+
+      <label for="apiKeyInput">Google Drive API Key</label>
+      <input id="apiKeyInput" type="text" tabindex="0" placeholder="AIzaSy..." />
+
+      <label for="manifestInput">Link thư mục (folder) Google Drive chứa video</label>
+      <input id="manifestInput" type="text" tabindex="0" placeholder="https://drive.google.com/drive/folders/..." />
+
+      <div class="settings-actions">
+        <button id="saveBtn" class="btn btn-primary" tabindex="0">Lưu cấu hình</button>
+        <button id="closeSettingsBtn" class="btn" tabindex="0">Đóng</button>
+      </div>
+
+      <p class="hint">
+        Folder phải để chia sẻ "Bất kỳ ai có đường liên kết - Người xem".
+        Nếu có file phụ đề (.srt) cùng tên với video, phụ đề sẽ tự động
+        gắn vào khi phát. Bấm phím <b>M</b> bất cứ lúc nào để mở lại
+        màn hình này.
+      </p>
+      <p id="settingsError" class="error"></p>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL SỬA VIDEO ==================== -->
+  <div id="editModal" class="modal-overlay hidden">
+    <div class="settings-box">
+      <h1>Sửa hiển thị</h1>
+      <label for="editTitleInput">Tên hiển thị</label>
+      <input id="editTitleInput" type="text" tabindex="0" />
+      <div class="settings-actions">
+        <button id="editSaveBtn" class="btn btn-primary" tabindex="0">Lưu</button>
+        <button id="editResetBtn" class="btn" tabindex="0">Về tên gốc</button>
+        <button id="editCancelBtn" class="btn" tabindex="0">Huỷ</button>
+      </div>
+      <p class="hint">
+        Đây chỉ là tên hiển thị trên trang này (lưu trong trình duyệt),
+        không đổi tên file thật trên Google Drive.
+      </p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
