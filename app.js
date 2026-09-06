@@ -62,6 +62,12 @@ const accountsListEl = document.getElementById('accountsList');
 const addAccountBtn = document.getElementById('addAccountBtn');
 const saveBtn = document.getElementById('saveBtn');
 const settingsError = document.getElementById('settingsError');
+const apiKeyGuide = document.getElementById('apiKeyGuide');
+const closeApiGuideBtn = document.getElementById('closeApiGuideBtn');
+const apiProjectBtn = document.getElementById('apiProjectBtn');
+const apiLibraryBtn = document.getElementById('apiLibraryBtn');
+const apiCredentialsBtn = document.getElementById('apiCredentialsBtn');
+const usePreviousKeyBtn = document.getElementById('usePreviousKeyBtn');
 
 const searchInput = document.getElementById('searchInput');
 const sortSelect = document.getElementById('sortSelect');
@@ -573,6 +579,66 @@ function showScreen(name) {
 
 let accountDraftRows = []; // [{label, apiKey, folderLink}] đang chỉnh trong modal, chưa lưu
 
+// ---------------- Quy trình lấy API Key ngay trong app ----------------
+let apiGuideRowIndex = -1;
+
+function openExternal(url) {
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function showApiKeyGuide(rowIndex) {
+  apiGuideRowIndex = Number(rowIndex);
+  if (!apiKeyGuide) return;
+  apiKeyGuide.classList.remove('hidden');
+  const row = accountDraftRows[apiGuideRowIndex];
+  const hasPrevious = apiGuideRowIndex > 0 && accountDraftRows
+    .slice(0, apiGuideRowIndex)
+    .some(function (r) { return (r.apiKey || '').trim(); });
+  if (usePreviousKeyBtn) {
+    usePreviousKeyBtn.disabled = !hasPrevious;
+    usePreviousKeyBtn.textContent = hasPrevious
+      ? '⚡ Dùng API Key của tài khoản trước'
+      : '⚠ Chưa có API Key ở tài khoản trước';
+  }
+  if (row && (row.apiKey || '').trim()) {
+    const box = apiKeyGuide.querySelector('.api-guide-note');
+    if (box) box.innerHTML = '<b>✓ Dòng này đã có API Key.</b> Bạn có thể bỏ qua bước 1–3, chỉ cần nhập link folder, kiểm tra và lưu.';
+  }
+  apiKeyGuide.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeApiKeyGuide() {
+  if (apiKeyGuide) apiKeyGuide.classList.add('hidden');
+  apiGuideRowIndex = -1;
+}
+
+if (closeApiGuideBtn) closeApiGuideBtn.addEventListener('click', closeApiKeyGuide);
+if (apiProjectBtn) apiProjectBtn.addEventListener('click', function () {
+  openExternal('https://console.cloud.google.com/projectcreate');
+});
+if (apiLibraryBtn) apiLibraryBtn.addEventListener('click', function () {
+  openExternal('https://console.cloud.google.com/apis/library/drive.googleapis.com');
+});
+if (apiCredentialsBtn) apiCredentialsBtn.addEventListener('click', function () {
+  openExternal('https://console.cloud.google.com/apis/credentials');
+});
+if (usePreviousKeyBtn) usePreviousKeyBtn.addEventListener('click', function () {
+  if (apiGuideRowIndex < 0 || !accountDraftRows[apiGuideRowIndex]) return;
+  let sourceKey = '';
+  for (let i = apiGuideRowIndex - 1; i >= 0; i--) {
+    sourceKey = (accountDraftRows[i].apiKey || '').trim();
+    if (sourceKey) break;
+  }
+  if (!sourceKey) return;
+  accountDraftRows[apiGuideRowIndex].apiKey = sourceKey;
+  renderAccountRows();
+  showApiKeyGuide(apiGuideRowIndex);
+  const rowEls = accountsListEl.querySelectorAll('.account-row');
+  const rowEl = rowEls[apiGuideRowIndex];
+  const inputs = rowEl ? rowEl.querySelectorAll('input[type="text"]') : [];
+  if (inputs[1]) inputs[1].focus();
+});
+
 function renderAccountRows() {
   accountsListEl.innerHTML = '';
   accountDraftRows.forEach(function (row, idx) {
@@ -649,6 +715,18 @@ function renderAccountRows() {
     });
 
     checkRow.appendChild(checkBtn);
+
+    const guideBtn = document.createElement('button');
+    guideBtn.type = 'button';
+    guideBtn.className = 'btn account-guide-btn';
+    guideBtn.textContent = '🧭 Hướng dẫn lấy API Key';
+    guideBtn.title = 'Quy trình từng bước lấy API Key';
+    guideBtn.setAttribute('tabindex', '0');
+    guideBtn.addEventListener('click', function () {
+      showApiKeyGuide(idx);
+    });
+
+    checkRow.appendChild(guideBtn);
     checkRow.appendChild(checkStatus);
 
     const removeBtn = document.createElement('button');
@@ -709,6 +787,13 @@ if (addAccountBtn) {
     // Focus vào ô "Tên gợi nhớ" (ô đầu tiên) của dòng mới, vì API Key
     // đã tự điền sẵn rồi - chỉ cần gõ tên + dán link folder.
     if (inputs[0]) inputs[0].focus();
+
+    // Nếu đã có Key ở dòng trước, dòng mới đã được điền tự động.
+    // Hiện hướng dẫn chỉ khi thực sự chưa có Key, để người dùng biết ngay phải làm gì.
+    const newRow = accountDraftRows[accountDraftRows.length - 1];
+    if (!newRow.apiKey) {
+      showApiKeyGuide(accountDraftRows.length - 1);
+    }
   });
 }
 

@@ -96,18 +96,82 @@
 
       <button id="addAccountBtn" class="btn" type="button" tabindex="0">+ Thêm tài khoản</button>
 
+      <div id="apiKeyGuide" class="api-key-guide hidden">
+        <div class="api-guide-head">
+          <div>
+            <strong>🧭 Quy trình lấy Google Drive API Key ngay trong app</strong>
+            <div class="api-guide-sub">App không thể tự bấm tạo Key trong Google Cloud vì Google yêu cầu tài khoản của bạn xác nhận quyền. App sẽ làm phần còn lại tối đa: mở đúng trang, hướng dẫn đúng nút, tự nhận/dán Key và kiểm tra ngay.</div>
+          </div>
+          <button id="closeApiGuideBtn" class="btn api-guide-close" type="button">Đóng hướng dẫn</button>
+        </div>
+
+        <div class="api-step" data-api-step="1">
+          <div class="api-step-no">1</div>
+          <div class="api-step-body">
+            <strong>Mở Google Cloud Console</strong>
+            <p>Nếu bạn đã có Project dùng cho API Key hiện tại thì <b>không cần tạo Project mới</b>; bỏ qua bước này.</p>
+            <button id="apiProjectBtn" class="btn api-link-btn" type="button">↗ Mở trang tạo Project</button>
+            <label class="api-done"><input type="checkbox"> Tôi đã có/chọn Project</label>
+          </div>
+        </div>
+
+        <div class="api-step" data-api-step="2">
+          <div class="api-step-no">2</div>
+          <div class="api-step-body">
+            <strong>Bật Google Drive API</strong>
+            <p>Trong Project đang dùng, mở Google Drive API và bấm <b>Enable / Bật</b> nếu chưa bật.</p>
+            <button id="apiLibraryBtn" class="btn api-link-btn" type="button">↗ Mở Google Drive API</button>
+            <label class="api-done"><input type="checkbox"> Tôi đã bật Google Drive API</label>
+          </div>
+        </div>
+
+        <div class="api-step" data-api-step="3">
+          <div class="api-step-no">3</div>
+          <div class="api-step-body">
+            <strong>Tạo API Key</strong>
+            <p>Mở Credentials → <b>Create credentials</b> → <b>API key</b>. Google sẽ hiện chuỗi bắt đầu bằng <code>AIza...</code>.</p>
+            <button id="apiCredentialsBtn" class="btn api-link-btn" type="button">↗ Mở Credentials</button>
+            <label class="api-done"><input type="checkbox"> Tôi đã tạo API Key</label>
+          </div>
+        </div>
+
+        <div class="api-step" data-api-step="4">
+          <div class="api-step-no">4</div>
+          <div class="api-step-body">
+            <strong>Đưa Key vào tài khoản mới</strong>
+            <p>Quay lại dòng tài khoản đang thêm. Dán Key vào ô <b>Google Drive API Key</b>. Nếu app có Key ở tài khoản trước, bấm nút <b>Dùng Key trước</b> để tự điền, không cần tạo Key mới.</p>
+            <button id="usePreviousKeyBtn" class="btn btn-primary" type="button">⚡ Dùng API Key của tài khoản trước</button>
+            <label class="api-done"><input type="checkbox"> Tôi đã đưa Key vào dòng tài khoản mới</label>
+          </div>
+        </div>
+
+        <div class="api-step" data-api-step="5">
+          <div class="api-step-no">5</div>
+          <div class="api-step-body">
+            <strong>Kiểm tra và hoàn tất</strong>
+            <p>Nhập <b>tên tài khoản</b> + <b>link folder Drive</b>, rồi bấm <b>🔍 Kiểm tra folder này</b>. Nếu hiện “✓ OK” thì bấm <b>Lưu cấu hình</b>.</p>
+            <label class="api-done"><input type="checkbox"> Tôi đã kiểm tra folder và sẵn sàng lưu</label>
+          </div>
+        </div>
+
+        <div class="api-guide-note">
+          <b>💡 Quan trọng:</b> API Key không gắn riêng với Gmail/Drive. Một Key của Google Cloud Project có thể dùng cho nhiều folder/tài khoản Drive. Bạn chỉ cần tạo Key mới khi muốn tách Project/Key. App <b>không thể tự tạo Key thay bạn</b> vì thao tác này nằm trong Google Cloud và cần quyền đăng nhập của bạn.
+        </div>
+      </div>
+
       <div class="settings-actions">
         <button id="saveBtn" class="btn btn-primary" tabindex="0">Lưu cấu hình</button>
         <button id="closeSettingsBtn" class="btn" tabindex="0">Đóng</button>
       </div>
 
       <p class="hint">
-        Mỗi folder phải để chia sẻ "Bất kỳ ai có đường liên kết - Người
-        xem". Muốn tính năng dự phòng hoạt động, các tài khoản nên chứa
-        video CÙNG TÊN file (không cần y hệt 100%, chỉ cần trùng phần
-        tên trước đuôi mở rộng). Nếu có file phụ đề (.srt) cùng tên với
-        video, phụ đề sẽ tự động gắn vào khi phát. Bấm phím <b>M</b> bất
-        cứ lúc nào để mở lại màn hình này.
+        <b>Quy trình thêm tài khoản:</b> bấm <b>+ Thêm tài khoản</b> →
+        app tự sao chép API Key từ dòng trước nếu có → nhập tên + link folder →
+        bấm <b>🔍 Kiểm tra folder này</b> → <b>Lưu cấu hình</b>.
+        Nếu chưa có API Key, bấm <b>🧭 Hướng dẫn lấy API Key</b> trong dòng mới
+        để làm theo từng bước 1→5 ngay trong app. Mỗi folder phải chia sẻ
+        "Bất kỳ ai có đường liên kết - Người xem". Các tài khoản dự phòng nên
+        có video CÙNG TÊN file. Phụ đề .srt cùng tên video sẽ tự động được gắn.
       </p>
       <p id="settingsError" class="error"></p>
     </div>

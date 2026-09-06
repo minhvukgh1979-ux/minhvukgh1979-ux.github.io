@@ -137,3 +137,25 @@ Giao diện đã được làm lại đầy đủ hơn:
   - **Sắp xếp**: theo tên, mới thêm gần đây, hoặc yêu thích trước.
 - Muốn xoá/tải video thật sự thì vẫn thao tác trực tiếp trên Google
   Drive (hoặc qua extension) — trang web chỉ đọc, không có quyền ghi.
+
+
+## Quy trình thêm tài khoản + lấy API Key ngay trong app
+
+Khi vào `⚙️ → + Thêm tài khoản`, app không còn chỉ nói “hãy lấy API Key” chung chung.
+
+- Nếu dòng trước đã có API Key: app **tự sao chép Key** sang dòng mới.
+- Nếu dòng mới chưa có Key: app **tự mở quy trình 1 → 5** trong màn hình cấu hình.
+- Bước nào cần thao tác bên ngoài app đều có nút mở **đúng trang Google Cloud**.
+- Sau khi dán/tạo Key, app kiểm tra folder ngay bằng `🔍 Kiểm tra folder này`.
+- Chỉ khi kiểm tra OK mới cần `Lưu cấu hình`.
+
+### 5 bước trong app
+
+1. **Project** — nếu đã có Project đang dùng thì bỏ qua; nếu chưa có, mở trang tạo Project.
+2. **Google Drive API** — mở Google Drive API và bấm Enable nếu chưa bật.
+3. **Credentials** — mở Credentials → Create credentials → API key.
+4. **Đưa Key vào dòng tài khoản mới** — dán Key hoặc bấm “Dùng API Key của tài khoản trước”.
+5. **Kiểm tra folder** — nhập tên + link folder → kiểm tra → lưu.
+
+> Google không cho một trang GitHub Pages tự đăng nhập và tự tạo API Key thay người dùng. Vì vậy phần duy nhất bắt buộc thao tác trên Google Cloud là xác nhận Project/API/Key. App đã tối đa hóa phần còn lại bằng link đúng trang, tự điền Key, kiểm tra folder và báo lỗi tại chỗ.
+
