@@ -10,6 +10,14 @@
 const DEFAULT_API_KEY = 'AIzaSyC8Wyr26jIvv7AETbMshe9u7jv2owfcQRw';
 const DEFAULT_FOLDER_LINK = 'https://drive.google.com/drive/folders/17wcsWpbjUcW5shb61luAqPjaRoh-8qL2';
 
+// ---------------- OAuth (đăng nhập Google, tránh download quota) ----------------
+const OAUTH_CLIENT_ID = '50814470997-lo6soguprrloh213jvdbll7t3kl5mk9l.apps.googleusercontent.com';
+const OAUTH_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+
+let accessToken = null;   // token hiện tại (null nếu chưa đăng nhập)
+let tokenClient = null;
+let swRegistration = null;
+
 const LS_KEY_API = 'drivetv_api_key';
 const LS_KEY_FOLDER_LINK = 'drivetv_folder_link';
 const LS_KEY_META = 'drivetv_meta';         // {fileId: {title, favorite, hidden}}
@@ -23,6 +31,7 @@ const settingsScreen = document.getElementById('settingsScreen');
 const editModal = document.getElementById('editModal');
 
 const settingsBtn = document.getElementById('settingsBtn');
+const signInBtn = document.getElementById('signInBtn');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const manifestInput = document.getElementById('manifestInput');
@@ -141,9 +150,76 @@ function extractFolderId(text) {
 }
 
 function streamUrl(fileId, apiKey) {
-  return 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) +
-         '?alt=media&key=' + encodeURIComponent(apiKey);
+  const base = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?alt=media';
+  // Nếu đã đăng nhập Google, không gắn key nữa - service worker (sw.js)
+  // sẽ tự chèn header Authorization: Bearer <token> vào request này.
+  // Nhờ vậy request được tính là "có xác thực", không bị tính vào
+  // download quota dành cho truy cập ẩn danh qua link công khai.
+  if (accessToken) return base;
+  return base + '&key=' + encodeURIComponent(apiKey);
 }
+
+// ---------------- OAuth: đăng nhập Google ----------------
+
+function sendTokenToServiceWorker(token) {
+  if (!('serviceWorker' in navigator)) return;
+  if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'SET_TOKEN', token: token });
+  } else {
+    navigator.serviceWorker.ready.then(function (reg) {
+      if (reg.active) reg.active.postMessage({ type: 'SET_TOKEN', token: token });
+    });
+  }
+}
+
+function updateSignInButton() {
+  if (!signInBtn) return;
+  signInBtn.textContent = accessToken ? '✅ Đã đăng nhập' : '👤 Đăng nhập';
+  signInBtn.title = accessToken
+    ? 'Đã đăng nhập Google (tránh giới hạn tải xuống)'
+    : 'Đăng nhập Google để tránh lỗi "download quota exceeded"';
+}
+
+function initGoogleAuth() {
+  if (!window.google || !google.accounts || !google.accounts.oauth2) {
+    // Thư viện GIS load async, thử lại sau 300ms nếu chưa sẵn sàng
+    setTimeout(initGoogleAuth, 300);
+    return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: OAUTH_CLIENT_ID,
+    scope: OAUTH_SCOPE,
+    callback: function (response) {
+      if (response && response.access_token) {
+        accessToken = response.access_token;
+        sendTokenToServiceWorker(accessToken);
+        updateSignInButton();
+        // Đặt hẹn giờ tự hỏi lại token mới trước khi hết hạn (~1 giờ)
+        const expiresInMs = (response.expires_in || 3600) * 1000;
+        setTimeout(function () {
+          if (tokenClient) tokenClient.requestAccessToken({ prompt: '' });
+        }, Math.max(expiresInMs - 60000, 30000));
+      }
+    }
+  });
+}
+
+if (signInBtn) {
+  signInBtn.addEventListener('click', function () {
+    if (!tokenClient) { initGoogleAuth(); setTimeout(function () { if (tokenClient) tokenClient.requestAccessToken(); }, 500); return; }
+    tokenClient.requestAccessToken();
+  });
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(function (reg) {
+    swRegistration = reg;
+    if (accessToken) sendTokenToServiceWorker(accessToken);
+  }).catch(function () { /* nếu SW không đăng ký được, app vẫn chạy bằng API key */ });
+}
+
+initGoogleAuth();
+updateSignInButton();
 
 function normalizeForSearch(str) {
   return (str || '')
