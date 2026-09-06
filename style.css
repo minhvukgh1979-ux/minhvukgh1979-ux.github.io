@@ -313,11 +313,34 @@ select { max-width: 220px; cursor: pointer; }
 
 .account-remove {
   grid-column: 2;
-  grid-row: 2 / span 3;
+  grid-row: 2 / span 4;
   align-self: stretch;
   padding: 0 12px;
   font-size: 16px;
 }
+
+.account-check-row {
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.account-check-btn {
+  padding: 6px 10px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.account-check-status {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.account-check-status.ok { color: #4caf7d; }
+.account-check-status.warn { color: #d0a24c; }
+.account-check-status.err { color: var(--danger); }
 
 #addAccountBtn { margin-top: 4px; }
 

@@ -579,6 +579,10 @@ function renderAccountRows() {
     const div = document.createElement('div');
     div.className = 'account-row';
 
+    const labelWrap = document.createElement('label');
+    labelWrap.className = 'account-label-wrap';
+    labelWrap.textContent = 'Tài khoản ' + (idx + 1);
+
     const labelInput = document.createElement('input');
     labelInput.type = 'text';
     labelInput.placeholder = 'Tên gợi nhớ (vd. minhvukgh1979)';
@@ -600,6 +604,53 @@ function renderAccountRows() {
     folderInput.setAttribute('tabindex', '0');
     folderInput.addEventListener('input', function () { row.folderLink = folderInput.value; });
 
+    // ---- Kiểm tra ngay tại chỗ: bấm là biết luôn folder có quét
+    // được video không, không cần Lưu rồi thử lại từ đầu. ----
+    const checkRow = document.createElement('div');
+    checkRow.className = 'account-check-row';
+
+    const checkBtn = document.createElement('button');
+    checkBtn.type = 'button';
+    checkBtn.className = 'btn account-check-btn';
+    checkBtn.textContent = '🔍 Kiểm tra folder này';
+    checkBtn.setAttribute('tabindex', '0');
+
+    const checkStatus = document.createElement('span');
+    checkStatus.className = 'account-check-status';
+
+    checkBtn.addEventListener('click', async function () {
+      const apiKey = (row.apiKey || '').trim();
+      const folderLink = (row.folderLink || '').trim();
+      if (!apiKey || !folderLink) {
+        checkStatus.textContent = 'Cần nhập đủ API Key và link folder trước đã.';
+        checkStatus.className = 'account-check-status err';
+        return;
+      }
+      checkBtn.disabled = true;
+      checkStatus.textContent = 'Đang kiểm tra...';
+      checkStatus.className = 'account-check-status';
+      try {
+        const folderId = extractFolderId(folderLink);
+        const files = await listFolderFiles(apiKey, folderId);
+        const videoCount = files.filter(isVideoFile).length;
+        if (videoCount > 0) {
+          checkStatus.textContent = '✓ OK - tìm thấy ' + videoCount + ' video.';
+          checkStatus.className = 'account-check-status ok';
+        } else {
+          checkStatus.textContent = '⚠ Kết nối được, nhưng folder chưa có video nào.';
+          checkStatus.className = 'account-check-status warn';
+        }
+      } catch (err) {
+        checkStatus.textContent = '✗ Lỗi: ' + err.message;
+        checkStatus.className = 'account-check-status err';
+      } finally {
+        checkBtn.disabled = false;
+      }
+    });
+
+    checkRow.appendChild(checkBtn);
+    checkRow.appendChild(checkStatus);
+
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn account-remove';
@@ -612,14 +663,11 @@ function renderAccountRows() {
       renderAccountRows();
     });
 
-    const labelWrap = document.createElement('label');
-    labelWrap.className = 'account-label-wrap';
-    labelWrap.textContent = 'Tài khoản ' + (idx + 1);
-
     div.appendChild(labelWrap);
     div.appendChild(labelInput);
     div.appendChild(keyInput);
     div.appendChild(folderInput);
+    div.appendChild(checkRow);
     div.appendChild(removeBtn);
     accountsListEl.appendChild(div);
   });
@@ -648,12 +696,19 @@ closeSettingsBtn.addEventListener('click', function () {
 
 if (addAccountBtn) {
   addAccountBtn.addEventListener('click', function () {
-    accountDraftRows.push({ label: '', apiKey: '', folderLink: '' });
+    // Tự điền sẵn API Key của dòng cuối cùng (thường dùng chung được
+    // cho mọi tài khoản, vì key gắn với 1 project Google Cloud chứ
+    // không gắn với tài khoản Drive nào) - đỡ phải gõ lại mỗi lần thêm.
+    const lastRow = accountDraftRows[accountDraftRows.length - 1];
+    const reuseApiKey = lastRow ? (lastRow.apiKey || '') : '';
+    accountDraftRows.push({ label: '', apiKey: reuseApiKey, folderLink: '' });
     renderAccountRows();
     const rows = accountsListEl.querySelectorAll('.account-row');
-    const lastRow = rows[rows.length - 1];
-    const firstInputOfLastRow = lastRow && lastRow.querySelector('input');
-    if (firstInputOfLastRow) firstInputOfLastRow.focus();
+    const lastRowEl = rows[rows.length - 1];
+    const inputs = lastRowEl ? lastRowEl.querySelectorAll('input') : [];
+    // Focus vào ô "Tên gợi nhớ" (ô đầu tiên) của dòng mới, vì API Key
+    // đã tự điền sẵn rồi - chỉ cần gõ tên + dán link folder.
+    if (inputs[0]) inputs[0].focus();
   });
 }
 
