@@ -37,21 +37,59 @@ quét 1 folder Google Drive mỗi lần mở lên và hiện sẵn mọi video t
 
 ### Bước 3 — Điền cấu hình vào web
 
-Mở file `app.js`, sửa 2 dòng đầu:
+Mở file `app.js`, sửa mảng `DEFAULT_ACCOUNTS` ở đầu file:
 
 ```js
-const DEFAULT_API_KEY = 'AIzaSy...';           // key ở Bước 2
-const DEFAULT_FOLDER_LINK = 'https://drive.google.com/drive/folders/XXXX'; // link ở Bước 1
+const DEFAULT_ACCOUNTS = [
+  {
+    label: 'minhvukgh1979',
+    apiKey: 'AIzaSy...',        // key ở Bước 2
+    folderLink: 'https://drive.google.com/drive/folders/XXXX' // link ở Bước 1
+  }
+];
 ```
 
 Lưu lại, đưa 3 file (`index.html`, `style.css`, `app.js`) lên GitHub
 Pages (hoặc bất kỳ hosting tĩnh nào). Xong — từ giờ mở trang lên là có
 video ngay, không cần nhập gì cả.
 
-> Nếu không muốn sửa `app.js` (ví dụ dùng chung code cho nhiều folder
-> khác nhau), có thể để 2 dòng đó trống — trang sẽ hỏi bạn nhập API Key
-> và link folder ngay lần mở đầu tiên, sau đó tự nhớ (lưu trong trình
-> duyệt), không hỏi lại nữa. Bấm phím **M** bất cứ lúc nào để đổi lại.
+> Nếu không muốn sửa `app.js`, có thể để `DEFAULT_ACCOUNTS = []` — trang
+> sẽ hỏi bạn nhập tài khoản ngay lần mở đầu tiên (qua màn hình Cấu
+> hình), sau đó tự nhớ (lưu trong trình duyệt), không hỏi lại nữa. Bấm
+> phím **M** bất cứ lúc nào để mở lại màn hình Cấu hình.
+
+## Dùng nhiều tài khoản Google Drive (để tránh giới hạn/quota)
+
+Nếu bạn upload CÙNG một bộ phim (cùng tên file) lên 2 (hoặc nhiều)
+tài khoản Google Drive khác nhau, web có thể tự quét cả 2 rồi gộp lại
+thành 1 danh sách — khi 1 tài khoản bị Google giới hạn (quota tải
+xuống), web tự động chuyển sang phát bản ở tài khoản kia, không cần
+bạn làm gì thêm.
+
+**Lưu ý quan trọng:** để tính năng dự phòng có tác dụng, tài khoản thứ
+2 cần một **folder THẬT SỰ khác** (chứa 1 bản copy phim, tốt nhất là
+thuộc chính Drive của tài khoản đó) — không phải cùng 1 folder ID với
+tài khoản 1. Nếu 2 "tài khoản" trỏ vào đúng 1 folder thì gộp lại cũng
+không giúp tránh giới hạn, vì Google tính quota theo từng FILE cụ thể.
+
+Các bước thêm tài khoản thứ 2 (ví dụ `minhvukgh1977`):
+
+1. Đăng nhập Google Drive bằng tài khoản `minhvukgh1977`, tạo 1 folder
+   mới, rồi upload vào đó các video (khuyến khích trùng tên file với
+   bản ở tài khoản 1, để web nhận ra là cùng 1 phim và gộp lại).
+2. Chia sẻ folder này giống Bước 1 ở trên: chuột phải → Chia sẻ →
+   "Bất kỳ ai có đường liên kết" → quyền "Người xem". Copy link folder.
+3. API Key ở Bước 2 dùng chung được cho mọi tài khoản (vì API Key là
+   của 1 project Google Cloud, không gắn với tài khoản Drive nào) —
+   không bắt buộc phải tạo Key riêng, dùng lại Key cũ cũng được.
+4. Mở web → bấm **⚙️ (Cấu hình)** hoặc phím **M** → bấm **"+ Thêm tài
+   khoản"** → điền tên gợi nhớ (vd. `minhvukgh1977`), API Key (bước 3),
+   và link folder (bước 2) → **Lưu cấu hình**.
+5. Web tự quét lại cả 2 tài khoản. Phim nào trùng tên sẽ hiện 1 thẻ
+   duy nhất kèm nhãn "2 nguồn" — khi phát mà tài khoản đầu bị lỗi/giới
+   hạn, web tự thử tài khoản còn lại.
+
+Có thể thêm nhiều hơn 2 tài khoản theo cách tương tự nếu cần.
 
 ## Từ giờ về sau
 

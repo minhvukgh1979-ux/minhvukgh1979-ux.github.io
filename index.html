@@ -83,13 +83,18 @@
   <!-- ==================== MODAL CẤU HÌNH ==================== -->
   <div id="settingsScreen" class="modal-overlay hidden">
     <div class="settings-box">
-      <h1>Cấu hình</h1>
+      <h1>Cấu hình tài khoản Google Drive</h1>
 
-      <label for="apiKeyInput">Google Drive API Key</label>
-      <input id="apiKeyInput" type="text" tabindex="0" placeholder="AIzaSy..." />
+      <p class="hint">
+        Có thể thêm nhiều tài khoản (mỗi tài khoản = 1 folder Drive).
+        Phim trùng tên ở nhiều tài khoản sẽ tự gộp làm 1 - khi 1 tài
+        khoản bị giới hạn (quota), app tự nhảy sang tài khoản khác
+        phát tiếp, không cần chọn lại.
+      </p>
 
-      <label for="manifestInput">Link thư mục (folder) Google Drive chứa video</label>
-      <input id="manifestInput" type="text" tabindex="0" placeholder="https://drive.google.com/drive/folders/..." />
+      <div id="accountsList" class="accounts-list"></div>
+
+      <button id="addAccountBtn" class="btn" type="button" tabindex="0">+ Thêm tài khoản</button>
 
       <div class="settings-actions">
         <button id="saveBtn" class="btn btn-primary" tabindex="0">Lưu cấu hình</button>
@@ -97,10 +102,12 @@
       </div>
 
       <p class="hint">
-        Folder phải để chia sẻ "Bất kỳ ai có đường liên kết - Người xem".
-        Nếu có file phụ đề (.srt) cùng tên với video, phụ đề sẽ tự động
-        gắn vào khi phát. Bấm phím <b>M</b> bất cứ lúc nào để mở lại
-        màn hình này.
+        Mỗi folder phải để chia sẻ "Bất kỳ ai có đường liên kết - Người
+        xem". Muốn tính năng dự phòng hoạt động, các tài khoản nên chứa
+        video CÙNG TÊN file (không cần y hệt 100%, chỉ cần trùng phần
+        tên trước đuôi mở rộng). Nếu có file phụ đề (.srt) cùng tên với
+        video, phụ đề sẽ tự động gắn vào khi phát. Bấm phím <b>M</b> bất
+        cứ lúc nào để mở lại màn hình này.
       </p>
       <p id="settingsError" class="error"></p>
     </div>

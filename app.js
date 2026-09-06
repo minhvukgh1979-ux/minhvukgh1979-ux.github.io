@@ -6,9 +6,33 @@
 // ============================================================
 // CẤU HÌNH MẶC ĐỊNH (điền 1 LẦN DUY NHẤT trước khi đưa code lên
 // GitHub Pages, để mở trang là có video ngay, không cần nhập gì).
+//
+// Hỗ trợ NHIỀU TÀI KHOẢN Google Drive cùng lúc: mỗi tài khoản là 1
+// folder riêng (apiKey có thể dùng chung 1 key cho mọi tài khoản, vì
+// API Key chỉ là khoá của 1 project Google Cloud, không gắn với tài
+// khoản Drive nào - cái khác nhau giữa các "tài khoản" ở đây chính là
+// folderLink, tức là 2 folder Drive khác nhau chứa 2 bản phim giống
+// nhau). App sẽ tự quét hết các folder bên dưới, phim nào trùng tên ở
+// nhiều tài khoản sẽ gộp làm 1 mục - khi phát mà tài khoản A bị giới
+// hạn (quota) thì tự động nhảy qua tài khoản B phát tiếp, không cần
+// bấm gì thêm.
+//
+// Để trống apiKey/folderLink của 1 dòng nếu chưa dùng tới - dòng đó sẽ
+// bị bỏ qua. Có thể thêm/bớt/tuỳ chỉnh ngay trên web qua màn hình
+// Cấu hình (⚙️ hoặc phím M) mà không cần sửa file này.
 // ============================================================
-const DEFAULT_API_KEY = 'AIzaSyC8Wyr26jIvv7AETbMshe9u7jv2owfcQRw';
-const DEFAULT_FOLDER_LINK = 'https://drive.google.com/drive/folders/17wcsWpbjUcW5shb61luAqPjaRoh-8qL2';
+const DEFAULT_ACCOUNTS = [
+  {
+    label: 'minhvukgh1979',
+    apiKey: 'AIzaSyC8Wyr26jIvv7AETbMshe9u7jv2owfcQRw',
+    folderLink: 'https://drive.google.com/drive/folders/17wcsWpbjUcW5shb61luAqPjaRoh-8qL2'
+  },
+  {
+    label: 'minhvukgh1977',
+    apiKey: '',      // <-- điền API Key dùng cho tài khoản 2 (có thể copy y hệt key ở trên)
+    folderLink: ''   // <-- điền link folder Drive THẬT SỰ của minhvukgh1977 (khác folder ở trên)
+  }
+];
 
 // ---------------- OAuth (đăng nhập Google, tránh download quota) ----------------
 const OAUTH_CLIENT_ID = '50814470997-lo6soguprrloh213jvdbll7t3kl5mk9l.apps.googleusercontent.com';
@@ -18,10 +42,11 @@ let accessToken = null;   // token hiện tại (null nếu chưa đăng nhập)
 let tokenClient = null;
 let swRegistration = null;
 
-const LS_KEY_API = 'drivetv_api_key';
-const LS_KEY_FOLDER_LINK = 'drivetv_folder_link';
-const LS_KEY_META = 'drivetv_meta';         // {fileId: {title, favorite, hidden}}
-const LS_KEY_PROGRESS = 'drivetv_progress'; // {fileId: seconds}
+const LS_KEY_API = 'drivetv_api_key';             // cũ - chỉ dùng để migrate 1 lần
+const LS_KEY_FOLDER_LINK = 'drivetv_folder_link'; // cũ - chỉ dùng để migrate 1 lần
+const LS_KEY_ACCOUNTS = 'drivetv_accounts';       // MỚI: [{label, apiKey, folderLink}, ...]
+const LS_KEY_META = 'drivetv_meta';         // {key: {title, favorite, hidden}}
+const LS_KEY_PROGRESS = 'drivetv_progress'; // {key: {time, duration}}
 
 // ---------------- DOM refs ----------------
 
@@ -33,8 +58,8 @@ const editModal = document.getElementById('editModal');
 const settingsBtn = document.getElementById('settingsBtn');
 const signInBtn = document.getElementById('signInBtn');
 const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-const apiKeyInput = document.getElementById('apiKeyInput');
-const manifestInput = document.getElementById('manifestInput');
+const accountsListEl = document.getElementById('accountsList');
+const addAccountBtn = document.getElementById('addAccountBtn');
 const saveBtn = document.getElementById('saveBtn');
 const settingsError = document.getElementById('settingsError');
 
@@ -76,7 +101,8 @@ let allVideos = [];        // dữ liệu gốc quét từ Drive
 let currentTab = 'all';
 let currentSubtitleUrl = null;
 let currentVideo = null;
-let editingFileId = null;
+let currentSourceIndex = -1; // vị trí trong video.sources đang phát (để nhảy tài khoản khi lỗi)
+let editingKey = null;
 let controlsHideTimer = null;
 let progressSaveTimer = null;
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -84,21 +110,41 @@ let speedIndex = 2;
 
 // ---------------- Config helpers ----------------
 
-function getConfig() {
-  return {
-    apiKey: localStorage.getItem(LS_KEY_API) || DEFAULT_API_KEY || '',
-    folderLink: localStorage.getItem(LS_KEY_FOLDER_LINK) || DEFAULT_FOLDER_LINK || ''
-  };
+// Bản cũ chỉ lưu 1 tài khoản (LS_KEY_API + LS_KEY_FOLDER_LINK). Nếu
+// trình duyệt người dùng còn cấu hình kiểu cũ và CHƯA có LS_KEY_ACCOUNTS,
+// tự chuyển sang định dạng mới 1 lần duy nhất để không mất cấu hình.
+function migrateOldConfigIfNeeded() {
+  if (localStorage.getItem(LS_KEY_ACCOUNTS)) return;
+  const oldKey = localStorage.getItem(LS_KEY_API);
+  const oldFolder = localStorage.getItem(LS_KEY_FOLDER_LINK);
+  if (oldKey || oldFolder) {
+    saveAccounts([{ label: '', apiKey: oldKey || '', folderLink: oldFolder || '' }]);
+  }
 }
 
-function saveConfig(apiKey, folderLink) {
-  localStorage.setItem(LS_KEY_API, apiKey);
-  localStorage.setItem(LS_KEY_FOLDER_LINK, folderLink);
+function getAccounts() {
+  migrateOldConfigIfNeeded();
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem(LS_KEY_ACCOUNTS) || '[]'); }
+  catch (e) { list = []; }
+  if (!Array.isArray(list)) list = [];
+
+  list = list.filter(function (a) { return a && a.apiKey && a.folderLink; });
+
+  if (list.length === 0) {
+    // Chưa có gì lưu trong trình duyệt -> dùng cấu hình mặc định điền
+    // sẵn trong code (DEFAULT_ACCOUNTS ở đầu file).
+    list = DEFAULT_ACCOUNTS.filter(function (a) { return a.apiKey && a.folderLink; });
+  }
+  return list;
+}
+
+function saveAccounts(accounts) {
+  localStorage.setItem(LS_KEY_ACCOUNTS, JSON.stringify(accounts));
 }
 
 function isConfigured() {
-  const c = getConfig();
-  return c.apiKey.trim() !== '' && c.folderLink.trim() !== '';
+  return getAccounts().length > 0;
 }
 
 function getMetaStore() {
@@ -110,14 +156,17 @@ function saveMetaStore(store) {
   localStorage.setItem(LS_KEY_META, JSON.stringify(store));
 }
 
-function getMeta(fileId) {
+// Lưu ý: "key" ở đây là khoá gộp phim theo TÊN (xem fetchFolderVideos),
+// không phải fileId của 1 file cụ thể - để yêu thích/ẩn/tên hiển thị/vị
+// trí xem giữ nguyên bất kể đang phát từ tài khoản/nguồn nào.
+function getMeta(key) {
   const store = getMetaStore();
-  return store[fileId] || { title: null, favorite: false, hidden: false };
+  return store[key] || { title: null, favorite: false, hidden: false };
 }
 
-function setMeta(fileId, patch) {
+function setMeta(key, patch) {
   const store = getMetaStore();
-  store[fileId] = Object.assign({ title: null, favorite: false, hidden: false }, store[fileId] || {}, patch);
+  store[key] = Object.assign({ title: null, favorite: false, hidden: false }, store[key] || {}, patch);
   saveMetaStore(store);
 }
 
@@ -126,15 +175,15 @@ function getProgressStore() {
   catch (e) { return {}; }
 }
 
-function getProgress(fileId) {
+function getProgress(key) {
   const store = getProgressStore();
-  return store[fileId] || null;
+  return store[key] || null;
 }
 
-function setProgress(fileId, data) {
+function setProgress(key, data) {
   const store = getProgressStore();
-  if (data === null) { delete store[fileId]; }
-  else { store[fileId] = data; }
+  if (data === null) { delete store[key]; }
+  else { store[key] = data; }
   localStorage.setItem(LS_KEY_PROGRESS, JSON.stringify(store));
 }
 
@@ -335,29 +384,80 @@ async function listFolderFiles(apiKey, folderId) {
   return files;
 }
 
-async function fetchFolderVideos(apiKey, folderLink) {
-  const folderId = extractFolderId(folderLink);
-  const files = await listFolderFiles(apiKey, folderId);
+// Quét NHIỀU tài khoản (mỗi tài khoản = 1 cặp apiKey + folder link),
+// rồi GỘP các video trùng TÊN PHIM (bỏ dấu, không phân biệt hoa/thường)
+// thành 1 mục duy nhất có nhiều "nguồn" (sources). Khi phát, app sẽ thử
+// lần lượt từng nguồn - nếu tài khoản này bị giới hạn (quota/403) sẽ tự
+// nhảy sang tài khoản khác phát cùng phim đó, không cần người xem làm
+// gì thêm. Trả về mảng video, mỗi video có dạng:
+//   { key, originalTitle, thumbnail, createdTime, sources: [
+//       { accountLabel, apiKey, fileId, subtitleFileId, subtitleExt }, ...
+//   ] }
+async function fetchFolderVideos(accounts) {
+  const merged = {};  // key (tên phim đã chuẩn hoá) -> video gộp
+  const order = [];   // giữ đúng thứ tự phim xuất hiện lần đầu
+  const errors = [];  // lỗi riêng của từng tài khoản (không làm hỏng cả danh sách)
 
-  const videoFiles = files.filter(isVideoFile);
-  const subtitleFiles = files.filter(isSubtitleFile);
+  for (let i = 0; i < accounts.length; i++) {
+    const acc = accounts[i];
+    if (!acc || !acc.apiKey || !acc.folderLink) continue;
+    const accLabel = acc.label || ('Tài khoản ' + (i + 1));
+    const folderId = extractFolderId(acc.folderLink);
 
-  const subtitleByBase = {};
-  subtitleFiles.forEach(function (f) { subtitleByBase[getBaseName(f.name)] = f; });
+    let files;
+    try {
+      files = await listFolderFiles(acc.apiKey, folderId);
+    } catch (err) {
+      // 1 tài khoản bị lỗi (sai key, hết quota liệt kê, folder riêng
+      // tư...) không nên làm mất luôn danh sách của các tài khoản còn
+      // lại - ghi nhận lỗi rồi bỏ qua, quét tiếp tài khoản kế.
+      errors.push(accLabel + ': ' + err.message);
+      continue;
+    }
 
-  const videos = videoFiles.map(function (f) {
-    const sub = subtitleByBase[getBaseName(f.name)];
-    return {
-      fileId: f.id,
-      originalTitle: getBaseName(f.name),
-      mimeType: f.mimeType || '',
-      thumbnail: f.thumbnailLink || null,
-      createdTime: f.createdTime || null,
-      subtitleFileId: sub ? sub.id : null,
-      subtitleExt: sub ? getExtension(sub.name) : null
-    };
-  });
+    const videoFiles = files.filter(isVideoFile);
+    const subtitleFiles = files.filter(isSubtitleFile);
+    const subtitleByBase = {};
+    subtitleFiles.forEach(function (f) { subtitleByBase[getBaseName(f.name)] = f; });
 
+    videoFiles.forEach(function (f) {
+      const baseName = getBaseName(f.name);
+      const key = normalizeForSearch(baseName);
+      const sub = subtitleByBase[baseName];
+
+      const source = {
+        accountLabel: accLabel,
+        apiKey: acc.apiKey,
+        fileId: f.id,
+        subtitleFileId: sub ? sub.id : null,
+        subtitleExt: sub ? getExtension(sub.name) : null
+      };
+
+      if (!merged[key]) {
+        merged[key] = {
+          key: key,
+          originalTitle: baseName,
+          mimeType: f.mimeType || '',
+          thumbnail: f.thumbnailLink || null,
+          createdTime: f.createdTime || null,
+          sources: [source]
+        };
+        order.push(key);
+      } else {
+        merged[key].sources.push(source);
+        if (!merged[key].thumbnail && f.thumbnailLink) merged[key].thumbnail = f.thumbnailLink;
+      }
+    });
+  }
+
+  if (order.length === 0 && errors.length > 0) {
+    // Không quét được bất kỳ tài khoản nào -> báo lỗi rõ ràng thay vì
+    // âm thầm trả về danh sách rỗng.
+    throw new Error(errors.join(' | '));
+  }
+
+  const videos = order.map(function (k) { return merged[k]; });
+  videos._partialErrors = errors; // để loadVideos() có thể cảnh báo nhẹ nếu muốn
   return videos;
 }
 
@@ -448,13 +548,13 @@ function assToVtt(assText) {
   return vtt;
 }
 
-async function buildSubtitleUrl(video, apiKey) {
-  if (!video.subtitleFileId) return null;
-  const res = await fetch(streamUrl(video.subtitleFileId, apiKey));
+async function buildSubtitleUrl(source) {
+  if (!source || !source.subtitleFileId) return null;
+  const res = await fetch(streamUrl(source.subtitleFileId, source.apiKey));
   if (!res.ok) return null;
   let text = await res.text();
-  if (video.subtitleExt === 'srt') text = srtToVtt(text);
-  else if (video.subtitleExt === 'ass' || video.subtitleExt === 'ssa') text = assToVtt(text);
+  if (source.subtitleExt === 'srt') text = srtToVtt(text);
+  else if (source.subtitleExt === 'ass' || source.subtitleExt === 'ssa') text = assToVtt(text);
   else if (!/^WEBVTT/.test(text.trim())) text = 'WEBVTT\n\n' + text;
   const blob = new Blob([text], { type: 'text/vtt' });
   return URL.createObjectURL(blob);
@@ -469,13 +569,72 @@ function showScreen(name) {
   if (name === 'player') playerScreen.classList.remove('hidden');
 }
 
+// ---------------- Cấu hình nhiều tài khoản (dòng động trong modal) ----------------
+
+let accountDraftRows = []; // [{label, apiKey, folderLink}] đang chỉnh trong modal, chưa lưu
+
+function renderAccountRows() {
+  accountsListEl.innerHTML = '';
+  accountDraftRows.forEach(function (row, idx) {
+    const div = document.createElement('div');
+    div.className = 'account-row';
+
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.placeholder = 'Tên gợi nhớ (vd. minhvukgh1979)';
+    labelInput.value = row.label || '';
+    labelInput.setAttribute('tabindex', '0');
+    labelInput.addEventListener('input', function () { row.label = labelInput.value; });
+
+    const keyInput = document.createElement('input');
+    keyInput.type = 'text';
+    keyInput.placeholder = 'Google Drive API Key (AIzaSy...)';
+    keyInput.value = row.apiKey || '';
+    keyInput.setAttribute('tabindex', '0');
+    keyInput.addEventListener('input', function () { row.apiKey = keyInput.value; });
+
+    const folderInput = document.createElement('input');
+    folderInput.type = 'text';
+    folderInput.placeholder = 'Link folder Google Drive (https://drive.google.com/drive/folders/...)';
+    folderInput.value = row.folderLink || '';
+    folderInput.setAttribute('tabindex', '0');
+    folderInput.addEventListener('input', function () { row.folderLink = folderInput.value; });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn account-remove';
+    removeBtn.textContent = '✕';
+    removeBtn.title = 'Xoá tài khoản này';
+    removeBtn.setAttribute('tabindex', '0');
+    removeBtn.addEventListener('click', function () {
+      accountDraftRows.splice(idx, 1);
+      if (accountDraftRows.length === 0) accountDraftRows.push({ label: '', apiKey: '', folderLink: '' });
+      renderAccountRows();
+    });
+
+    const labelWrap = document.createElement('label');
+    labelWrap.className = 'account-label-wrap';
+    labelWrap.textContent = 'Tài khoản ' + (idx + 1);
+
+    div.appendChild(labelWrap);
+    div.appendChild(labelInput);
+    div.appendChild(keyInput);
+    div.appendChild(folderInput);
+    div.appendChild(removeBtn);
+    accountsListEl.appendChild(div);
+  });
+}
+
 function openSettings() {
-  const c = getConfig();
-  apiKeyInput.value = c.apiKey;
-  manifestInput.value = c.folderLink;
+  const accounts = getAccounts();
+  accountDraftRows = accounts.length > 0
+    ? accounts.map(function (a) { return { label: a.label || '', apiKey: a.apiKey || '', folderLink: a.folderLink || '' }; })
+    : [{ label: '', apiKey: '', folderLink: '' }];
+  renderAccountRows();
   settingsError.textContent = '';
   settingsScreen.classList.remove('hidden');
-  apiKeyInput.focus();
+  const firstInput = accountsListEl.querySelector('input');
+  if (firstInput) firstInput.focus();
 }
 
 function closeSettings() {
@@ -487,14 +646,32 @@ closeSettingsBtn.addEventListener('click', function () {
   if (isConfigured()) closeSettings();
 });
 
+if (addAccountBtn) {
+  addAccountBtn.addEventListener('click', function () {
+    accountDraftRows.push({ label: '', apiKey: '', folderLink: '' });
+    renderAccountRows();
+    const rows = accountsListEl.querySelectorAll('.account-row');
+    const lastRow = rows[rows.length - 1];
+    const firstInputOfLastRow = lastRow && lastRow.querySelector('input');
+    if (firstInputOfLastRow) firstInputOfLastRow.focus();
+  });
+}
+
 saveBtn.addEventListener('click', function () {
-  const apiKey = apiKeyInput.value.trim();
-  const folderLink = manifestInput.value.trim();
-  if (!apiKey || !folderLink) {
-    settingsError.textContent = 'Vui lòng nhập đủ API Key và link folder Google Drive.';
+  const cleaned = accountDraftRows.map(function (r) {
+    return { label: (r.label || '').trim(), apiKey: (r.apiKey || '').trim(), folderLink: (r.folderLink || '').trim() };
+  });
+  // Bỏ các dòng hoàn toàn trống (không đụng tới), chỉ giữ dòng có ít
+  // nhất API Key hoặc link folder đã điền.
+  const nonEmpty = cleaned.filter(function (r) { return r.apiKey || r.folderLink; });
+  const valid = nonEmpty.filter(function (r) { return r.apiKey && r.folderLink; });
+
+  if (valid.length === 0) {
+    settingsError.textContent = 'Vui lòng nhập đủ API Key và link folder Google Drive cho ít nhất 1 tài khoản.';
     return;
   }
-  saveConfig(apiKey, folderLink);
+
+  saveAccounts(valid);
   closeSettings();
   showScreen('grid');
   loadVideos();
@@ -515,8 +692,8 @@ searchInput.addEventListener('input', applyFilters);
 refreshBtn.addEventListener('click', function () { loadVideos(); });
 
 function decorate(video) {
-  const meta = getMeta(video.fileId);
-  const progress = getProgress(video.fileId);
+  const meta = getMeta(video.key);
+  const progress = getProgress(video.key);
   return Object.assign({}, video, {
     title: meta.title || video.originalTitle,
     favorite: !!meta.favorite,
@@ -569,7 +746,7 @@ function renderVideos(videos) {
     card.className = 'card';
     card.setAttribute('tabindex', '0');
     card.setAttribute('role', 'button');
-    card.dataset.fileId = video.fileId;
+    card.dataset.key = video.key;
 
     const thumbWrap = document.createElement('div');
     thumbWrap.className = 'thumb-wrap';
@@ -585,11 +762,19 @@ function renderVideos(videos) {
     }
     thumbWrap.appendChild(img);
 
-    if (video.subtitleFileId) {
+    if (video.sources.some(function (s) { return s.subtitleFileId; })) {
       const ccBadge = document.createElement('span');
       ccBadge.className = 'badge badge-cc';
       ccBadge.textContent = 'CC';
       thumbWrap.appendChild(ccBadge);
+    }
+    if (video.sources.length > 1) {
+      const multiBadge = document.createElement('span');
+      multiBadge.className = 'badge badge-multi';
+      multiBadge.textContent = video.sources.length + ' nguồn';
+      multiBadge.title = 'Có ở ' + video.sources.length + ' tài khoản: ' +
+        video.sources.map(function (s) { return s.accountLabel; }).join(', ');
+      thumbWrap.appendChild(multiBadge);
     }
     if (video.favorite) {
       const favBadge = document.createElement('span');
@@ -627,7 +812,7 @@ function renderVideos(videos) {
     if (video.favorite) favBtn.classList.add('active-fav');
     favBtn.addEventListener('click', function (e) {
       e.stopPropagation();
-      setMeta(video.fileId, { favorite: !video.favorite });
+      setMeta(video.key, { favorite: !video.favorite });
       applyFilters();
     });
 
@@ -642,7 +827,7 @@ function renderVideos(videos) {
     hideBtn.textContent = video.hidden ? '↩ Khôi phục' : '🙈 Ẩn';
     hideBtn.addEventListener('click', function (e) {
       e.stopPropagation();
-      setMeta(video.fileId, { hidden: !video.hidden });
+      setMeta(video.key, { hidden: !video.hidden });
       applyFilters();
     });
 
@@ -664,14 +849,20 @@ function renderVideos(videos) {
 }
 
 async function loadVideos() {
-  const c = getConfig();
-  statusMsg.textContent = 'Đang quét folder Google Drive...';
+  const accounts = getAccounts();
+  statusMsg.textContent = 'Đang quét folder Google Drive (' + accounts.length + ' tài khoản)...';
   videoGrid.innerHTML = '';
 
   try {
-    allVideos = await fetchFolderVideos(c.apiKey, c.folderLink);
+    allVideos = await fetchFolderVideos(accounts);
     searchInput.value = '';
     applyFilters();
+    const partialErrors = allVideos._partialErrors || [];
+    if (partialErrors.length > 0) {
+      // Vẫn quét được ít nhất 1 tài khoản, nhưng có tài khoản khác lỗi -
+      // hiện thêm cảnh báo nhẹ phía sau số liệu video, không chặn xem.
+      statusMsg.textContent += ' (Lỗi ở ' + partialErrors.length + ' tài khoản: ' + partialErrors.join(' | ') + ')';
+    }
     const firstCard = videoGrid.querySelector('.card');
     if (firstCard) firstCard.focus();
   } catch (err) {
@@ -682,7 +873,7 @@ async function loadVideos() {
 // ---------------- Edit modal ----------------
 
 function openEditModal(video) {
-  editingFileId = video.fileId;
+  editingKey = video.key;
   editTitleInput.value = video.title;
   editModal.classList.remove('hidden');
   editTitleInput.focus();
@@ -690,20 +881,20 @@ function openEditModal(video) {
 
 function closeEditModal() {
   editModal.classList.add('hidden');
-  editingFileId = null;
+  editingKey = null;
 }
 
 editSaveBtn.addEventListener('click', function () {
-  if (!editingFileId) return;
+  if (!editingKey) return;
   const val = editTitleInput.value.trim();
-  setMeta(editingFileId, { title: val || null });
+  setMeta(editingKey, { title: val || null });
   closeEditModal();
   applyFilters();
 });
 
 editResetBtn.addEventListener('click', function () {
-  if (!editingFileId) return;
-  setMeta(editingFileId, { title: null });
+  if (!editingKey) return;
+  setMeta(editingKey, { title: null });
   closeEditModal();
   applyFilters();
 });
@@ -772,56 +963,96 @@ function describePlaybackError(status) {
   return 'Không phát được video. Vui lòng kiểm tra lại kết nối mạng hoặc quyền chia sẻ file trên Google Drive rồi tải lại trang.';
 }
 
+// Thử phát lần lượt từng "nguồn" (mỗi nguồn = 1 tài khoản) của 1 phim,
+// bắt đầu từ startIndex. Nguồn nào bị lỗi (403 hết quota/quyền, 404...)
+// sẽ tự động thử nguồn kế tiếp, không cần người xem bấm gì. Trả về
+// true nếu tìm được 1 nguồn phát được, false nếu tất cả đều lỗi.
+async function tryLoadSource(video, startIndex) {
+  for (let i = startIndex; i < video.sources.length; i++) {
+    const source = video.sources[i];
+    const vidUrl = streamUrl(source.fileId, source.apiKey);
+
+    if (video.sources.length > 1) {
+      statusForPlayerLoading(source, i, video.sources.length);
+    }
+
+    const check = await checkPlayableUrl(vidUrl);
+    if (!check.ok) continue; // thử nguồn kế tiếp
+
+    currentSourceIndex = i;
+    hidePlayerError();
+    videoPlayer.src = vidUrl;
+
+    const saved = getProgress(video.key);
+    if (saved && saved.time > 5 && saved.duration && saved.time < saved.duration - 5) {
+      videoPlayer.currentTime = saved.time;
+    }
+
+    videoPlayer.play().catch(function () { /* có thể bị chặn autoplay */ });
+    updatePlayPauseIcon();
+
+    if (source.subtitleFileId) {
+      try {
+        const url = await buildSubtitleUrl(source);
+        if (url) {
+          currentSubtitleUrl = url;
+          subtitleTrack.src = url;
+          subtitleBtn.classList.remove('hidden');
+          subtitleBtn.classList.add('on');
+          if (videoPlayer.textTracks && videoPlayer.textTracks[0]) {
+            videoPlayer.textTracks[0].mode = 'showing';
+          }
+        }
+      } catch (e) { /* bỏ qua nếu không tải được phụ đề */ }
+    }
+    return true;
+  }
+  return false;
+}
+
+function statusForPlayerLoading(source, index, total) {
+  if (index === 0) return; // lần thử đầu tiên không cần báo gì
+  showPlayerError('Tài khoản trước bị giới hạn - đang thử phát từ "' + source.accountLabel + '" (' + (index + 1) + '/' + total + ')...');
+}
+
 async function openPlayer(rawVideo) {
   const video = decorate(rawVideo);
-  const c = getConfig();
   currentVideo = video;
+  currentSourceIndex = -1;
   clearSubtitle();
   hidePlayerError();
 
   playerTitle.textContent = video.title;
-  const vidUrl = streamUrl(video.fileId, c.apiKey);
   videoPlayer.playbackRate = SPEEDS[speedIndex];
   speedBtn.textContent = SPEEDS[speedIndex] + 'x';
   showScreen('player');
   showControls();
 
-  const check = await checkPlayableUrl(vidUrl);
-  if (!check.ok) {
-    showPlayerError(describePlaybackError(check.status));
-    return;
-  }
-
-  videoPlayer.src = vidUrl;
-
-  const saved = getProgress(video.fileId);
-  if (saved && saved.time > 5 && saved.duration && saved.time < saved.duration - 5) {
-    videoPlayer.currentTime = saved.time;
-  }
-
-  videoPlayer.play().catch(function () { /* có thể bị chặn autoplay */ });
-  updatePlayPauseIcon();
-
-  if (video.subtitleFileId) {
-    try {
-      const url = await buildSubtitleUrl(video, c.apiKey);
-      if (url) {
-        currentSubtitleUrl = url;
-        subtitleTrack.src = url;
-        subtitleBtn.classList.remove('hidden');
-        subtitleBtn.classList.add('on');
-        if (videoPlayer.textTracks && videoPlayer.textTracks[0]) {
-          videoPlayer.textTracks[0].mode = 'showing';
-        }
-      }
-    } catch (e) { /* bỏ qua nếu không tải được phụ đề */ }
+  const played = await tryLoadSource(video, 0);
+  if (!played) {
+    const lastSource = video.sources[video.sources.length - 1];
+    const single = video.sources.length === 1;
+    hidePlayerError();
+    const check = await checkPlayableUrl(streamUrl(lastSource.fileId, lastSource.apiKey));
+    showPlayerError(
+      (single ? '' : 'Đã thử ' + video.sources.length + ' tài khoản, tài khoản nào cũng lỗi. ') +
+      describePlaybackError(check.status)
+    );
   }
 }
 
 videoPlayer.addEventListener('error', function () {
   // Trường hợp preflight qua được nhưng thẻ <video> vẫn không phát nổi
-  // (vd. định dạng codec không hỗ trợ, hoặc lỗi phát sinh giữa chừng).
-  if (currentVideo && playerError && playerError.classList.contains('hidden')) {
+  // giữa chừng (vd. quota bị tính sau khi đã stream 1 phần, codec lỗi,
+  // mất kết nối...). Nếu phim này còn nguồn khác chưa thử, tự nhảy
+  // sang nguồn kế tiếp thay vì báo lỗi luôn.
+  if (!currentVideo) return;
+  const nextIndex = currentSourceIndex + 1;
+  if (nextIndex < currentVideo.sources.length) {
+    tryLoadSource(currentVideo, nextIndex).then(function (ok) {
+      if (!ok) showPlayerError('Không phát được video này. Định dạng có thể không được trình duyệt hỗ trợ, hoặc kết nối tới Google Drive bị gián đoạn.');
+    });
+  } else if (playerError && playerError.classList.contains('hidden')) {
     showPlayerError('Không phát được video này. Định dạng có thể không được trình duyệt hỗ trợ, hoặc kết nối tới Google Drive bị gián đoạn.');
   }
 });
@@ -829,9 +1060,9 @@ videoPlayer.addEventListener('error', function () {
 function saveCurrentProgress() {
   if (!currentVideo || !videoPlayer.duration) return;
   if (videoPlayer.currentTime < 3 || videoPlayer.currentTime > videoPlayer.duration - 2) {
-    setProgress(currentVideo.fileId, null);
+    setProgress(currentVideo.key, null);
   } else {
-    setProgress(currentVideo.fileId, { time: videoPlayer.currentTime, duration: videoPlayer.duration });
+    setProgress(currentVideo.key, { time: videoPlayer.currentTime, duration: videoPlayer.duration });
   }
 }
 
@@ -894,7 +1125,7 @@ videoPlayer.addEventListener('loadedmetadata', function () {
 });
 
 videoPlayer.addEventListener('ended', function () {
-  if (currentVideo) setProgress(currentVideo.fileId, { time: videoPlayer.duration, duration: videoPlayer.duration });
+  if (currentVideo) setProgress(currentVideo.key, { time: videoPlayer.duration, duration: videoPlayer.duration });
   updatePlayPauseIcon();
 });
 

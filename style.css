@@ -186,6 +186,7 @@ select { max-width: 220px; cursor: pointer; }
 
 .badge-cc { left: 8px; }
 .badge-fav { right: 8px; color: var(--star); font-size: 16px; background: rgba(0,0,0,0.5); padding: 2px 6px; }
+.badge-multi { left: 8px; bottom: 8px; top: auto; background: rgba(0,0,0,0.65); }
 
 .progress-sliver {
   position: absolute;
@@ -278,6 +279,47 @@ select { max-width: 220px; cursor: pointer; }
   margin-top: 18px;
   flex-wrap: wrap;
 }
+
+.accounts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.account-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 8px;
+  padding: 10px;
+  border: 1px solid #2a3441;
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.account-row input[type="text"] {
+  grid-column: 1;
+  margin: 0;
+}
+
+.account-label-wrap {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin: 0 0 2px;
+}
+
+.account-remove {
+  grid-column: 2;
+  grid-row: 2 / span 3;
+  align-self: stretch;
+  padding: 0 12px;
+  font-size: 16px;
+}
+
+#addAccountBtn { margin-top: 4px; }
 
 .hint {
   color: var(--text-dim);
