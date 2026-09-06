@@ -243,7 +243,7 @@ function formatTime(sec) {
 // ---------------- Nhận diện loại file ----------------
 
 const VIDEO_EXTENSIONS = ['mp4', 'webm', 'ogg', 'ogv', 'mov', 'm4v', 'mkv'];
-const SUBTITLE_EXTENSIONS = ['srt', 'vtt'];
+const SUBTITLE_EXTENSIONS = ['srt', 'vtt', 'ass', 'ssa'];
 
 function getExtension(name) {
   const m = /\.([a-zA-Z0-9]+)$/.exec(name || '');
@@ -326,12 +326,92 @@ function srtToVtt(srtText) {
   return 'WEBVTT\n\n' + text;
 }
 
+// ---------------- Chuyển .ass/.ssa sang .vtt ----------------
+
+// Đổi mốc thời gian kiểu ASS "0:00:01.23" (H:MM:SS.cc, cc = centgiây)
+// sang mốc thời gian kiểu VTT "00:00:01.230" (HH:MM:SS.mmm).
+function assTimeToVtt(t) {
+  const m = /^(\d+):(\d{2}):(\d{2})\.(\d{2})$/.exec(t.trim());
+  if (!m) return '00:00:00.000';
+  const h = String(m[1]).padStart(2, '0');
+  const mm = m[2];
+  const ss = m[3];
+  const ms = m[4] + '0'; // centigiây (2 chữ số) -> mili giây (3 chữ số)
+  return h + ':' + mm + ':' + ss + '.' + ms;
+}
+
+// Bóc sạch các mã định dạng riêng của ASS trong nội dung câu thoại,
+// ví dụ {\an8}, {\pos(400,300)}, {\c&H0000FF&}... và đổi \N, \n, \h
+// thành xuống dòng / khoảng trắng cho dễ đọc trên phụ đề thường.
+function cleanAssText(text) {
+  return text
+    .replace(/\{[^}]*\}/g, '')
+    .replace(/\\N/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\h/g, ' ')
+    .trim();
+}
+
+function assToVtt(assText) {
+  const raw = assText.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = raw.split('\n');
+
+  let inEvents = false;
+  let fields = [];
+  let idxStart = -1, idxEnd = -1, idxText = -1;
+  const cues = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (/^\[.+\]$/.test(trimmed)) {
+      inEvents = /^\[Events\]$/i.test(trimmed);
+      continue;
+    }
+    if (!inEvents) continue;
+
+    if (/^Format:/i.test(trimmed)) {
+      fields = trimmed.substring(trimmed.indexOf(':') + 1).split(',').map(function (s) { return s.trim().toLowerCase(); });
+      idxStart = fields.indexOf('start');
+      idxEnd = fields.indexOf('end');
+      idxText = fields.indexOf('text');
+      continue;
+    }
+
+    if (/^Dialogue:/i.test(trimmed) && idxText !== -1) {
+      const body = trimmed.substring(trimmed.indexOf(':') + 1);
+      // Text là trường cuối cùng và có thể chứa dấu phẩy, nên chỉ tách
+      // đúng số trường đứng trước nó, phần còn lại giữ nguyên làm text.
+      const parts = body.split(',');
+      if (parts.length <= idxText) continue;
+      const head = parts.slice(0, idxText);
+      const textPart = parts.slice(idxText).join(',');
+
+      const start = idxStart !== -1 ? assTimeToVtt(head[idxStart]) : null;
+      const end = idxEnd !== -1 ? assTimeToVtt(head[idxEnd]) : null;
+      const text = cleanAssText(textPart);
+
+      if (start && end && text) {
+        cues.push({ start: start, end: end, text: text });
+      }
+    }
+  }
+
+  let vtt = 'WEBVTT\n\n';
+  cues.forEach(function (cue, i) {
+    vtt += (i + 1) + '\n' + cue.start + ' --> ' + cue.end + '\n' + cue.text + '\n\n';
+  });
+  return vtt;
+}
+
 async function buildSubtitleUrl(video, apiKey) {
   if (!video.subtitleFileId) return null;
   const res = await fetch(streamUrl(video.subtitleFileId, apiKey));
   if (!res.ok) return null;
   let text = await res.text();
   if (video.subtitleExt === 'srt') text = srtToVtt(text);
+  else if (video.subtitleExt === 'ass' || video.subtitleExt === 'ssa') text = assToVtt(text);
   else if (!/^WEBVTT/.test(text.trim())) text = 'WEBVTT\n\n' + text;
   const blob = new Blob([text], { type: 'text/vtt' });
   return URL.createObjectURL(blob);
