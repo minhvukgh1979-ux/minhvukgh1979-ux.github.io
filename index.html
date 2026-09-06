@@ -174,34 +174,111 @@
 
 
 
-      <div class="oauth-setup-box">
-        <div class="shared-config-title">🔐 Cấu hình Google OAuth Client ID — làm 1 lần cho máy này</div>
-        <div class="shared-config-help">
-          OAuth dùng để cho phép app <b>đọc và ghi app-config.json</b> trên Google Drive.
-          API Key <b>không có quyền ghi Drive</b>, nên đây là bước bắt buộc nếu muốn đồng bộ nhiều máy.
+      <div class="oauth-wizard-box">
+        <div class="oauth-wizard-head">
+          <div>
+            <strong>🔐 Cấu hình Google OAuth Client ID</strong>
+            <div class="oauth-wizard-sub">
+              Quy trình này giúp app được Google cho phép <b>đọc và ghi file app-config.json</b>
+              trên Drive. Làm từng bước ngay trong app; bước nào cần thao tác trên Google
+              Cloud thì app có nút mở đúng trang.
+            </div>
+          </div>
+          <button id="closeOAuthWizardBtn" class="btn" type="button">Đóng</button>
         </div>
-        <div class="oauth-steps">
-          <div><b>1.</b> Đăng nhập Google Cloud bằng đúng Google Account bạn muốn quản lý cấu hình.</div>
-          <div><b>2.</b> Chọn đúng Project đang dùng cho app.</div>
-          <div><b>3.</b> Mở <b>APIs & Services → OAuth consent screen</b> và tạo/cấu hình consent screen nếu chưa có.</div>
-          <div><b>4.</b> Mở <b>APIs & Services → Credentials → Create credentials → OAuth client ID</b>.</div>
-          <div><b>5.</b> Chọn <b>Web application</b>.</div>
-          <div><b>6.</b> Ở <b>Authorized JavaScript origins</b>, thêm đúng địa chỉ GitHub Pages của bạn, ví dụ:
-            <code>https://minhvukgh1979-ux.github.io</code>.</div>
-          <div><b>7.</b> Bấm <b>Create</b> → copy <b>Client ID</b> (chuỗi kết thúc bằng <code>.apps.googleusercontent.com</code>).</div>
-          <div><b>8.</b> Dán Client ID vào ô bên dưới và bấm <b>Lưu Client ID</b>.</div>
+
+        <div class="oauth-progress">
+          <span data-owstep="1">1. Account</span>
+          <span data-owstep="2">2. Project</span>
+          <span data-owstep="3">3. Drive API</span>
+          <span data-owstep="4">4. Consent</span>
+          <span data-owstep="5">5. Client ID</span>
+          <span data-owstep="6">6. Origin</span>
+          <span data-owstep="7">7. Nhập vào app</span>
+          <span data-owstep="8">8. Kiểm tra</span>
         </div>
-        <div class="oauth-links">
-          <button id="oauthConsoleBtn" class="btn" type="button">↗ Google Cloud Console</button>
-          <button id="oauthConsentBtn" class="btn" type="button">↗ OAuth Consent Screen</button>
-          <button id="oauthCredentialsBtn" class="btn" type="button">↗ Credentials</button>
+
+        <div class="oauth-wizard-panel" data-owpanel="1">
+          <div class="oauth-step-number">1</div>
+          <h3>Nhập Google Account</h3>
+          <p>Nhập đúng Google Account sẽ dùng để quản lý Google Cloud Project và cấp quyền Drive cho app.</p>
+          <input id="oauthWizardAccount" type="email" placeholder="ví dụ: minhvukgh1977@gmail.com" autocomplete="email">
+          <button id="oauthWizardNext1" class="btn btn-primary" type="button">Tiếp tục →</button>
+          <div class="oauth-note">⚠ Hãy dùng đúng account này ở các bước Google Cloud tiếp theo.</div>
         </div>
-        <div class="shared-config-row">
-          <input id="googleClientIdInput" type="text" placeholder="Ví dụ: 123456789012-abc...apps.googleusercontent.com">
-          <button id="saveGoogleClientIdBtn" class="btn btn-primary" type="button">💾 Lưu Client ID</button>
-          <button id="testGoogleOAuthBtn" class="btn" type="button">🔐 Thử đăng nhập Google</button>
+
+        <div class="oauth-wizard-panel hidden" data-owpanel="2">
+          <div class="oauth-step-number">2</div>
+          <h3>Chọn hoặc tạo Google Cloud Project</h3>
+          <p>Đăng nhập Google Cloud bằng <b id="oauthWizardAccountLabel"></b>, sau đó chọn Project hiện có hoặc tạo Project mới.</p>
+          <button id="oauthOpenCloudBtn" class="btn api-link-btn" type="button">↗ Mở Google Cloud</button>
+          <button id="oauthCreateProjectBtn" class="btn api-link-btn" type="button">↗ Tạo Project</button>
+          <label class="oauth-check"><input id="oauthProjectDone" type="checkbox"> Tôi đã chọn/tạo Project bằng account trên</label>
+          <button id="oauthWizardNext2" class="btn btn-primary" type="button">Tiếp tục →</button>
         </div>
-        <div id="googleOAuthStatus" class="shared-config-status"></div>
+
+        <div class="oauth-wizard-panel hidden" data-owpanel="3">
+          <div class="oauth-step-number">3</div>
+          <h3>Bật Google Drive API</h3>
+          <p>Trong đúng Project vừa chọn, mở Google Drive API và bấm <b>Enable</b> nếu chưa bật.</p>
+          <button id="oauthOpenDriveApiBtn" class="btn api-link-btn" type="button">↗ Mở Google Drive API</button>
+          <label class="oauth-check"><input id="oauthDriveDone" type="checkbox"> Tôi đã bật Google Drive API</label>
+          <button id="oauthWizardNext3" class="btn btn-primary" type="button">Tiếp tục →</button>
+        </div>
+
+        <div class="oauth-wizard-panel hidden" data-owpanel="4">
+          <div class="oauth-step-number">4</div>
+          <h3>Cấu hình OAuth consent screen</h3>
+          <p>Vào OAuth consent screen. Nếu Google yêu cầu, tạo/cấu hình màn hình xin quyền. Với app cá nhân/testing, thêm chính Google Account sẽ dùng app vào Test users nếu Google yêu cầu.</p>
+          <button id="oauthOpenConsentBtn" class="btn api-link-btn" type="button">↗ Mở OAuth Consent Screen</button>
+          <label class="oauth-check"><input id="oauthConsentDone" type="checkbox"> Tôi đã cấu hình Consent Screen và Test user nếu được yêu cầu</label>
+          <button id="oauthWizardNext4" class="btn btn-primary" type="button">Tiếp tục →</button>
+        </div>
+
+        <div class="oauth-wizard-panel hidden" data-owpanel="5">
+          <div class="oauth-step-number">5</div>
+          <h3>Tạo OAuth Client ID</h3>
+          <p>Vào Credentials → Create credentials → <b>OAuth client ID</b>. Chọn <b>Web application</b>.</p>
+          <button id="oauthOpenCredentialsBtn" class="btn api-link-btn" type="button">↗ Mở Credentials</button>
+          <div class="oauth-mini-help">
+            <b>Application type:</b> Web application<br>
+            Sau khi tạo, Google sẽ cung cấp một <b>Client ID</b> kết thúc bằng
+            <code>.apps.googleusercontent.com</code>.
+          </div>
+          <label class="oauth-check"><input id="oauthClientDone" type="checkbox"> Tôi đã tạo OAuth Client ID loại Web application</label>
+          <button id="oauthWizardNext5" class="btn btn-primary" type="button">Tiếp tục →</button>
+        </div>
+
+        <div class="oauth-wizard-panel hidden" data-owpanel="6">
+          <div class="oauth-step-number">6</div>
+          <h3>Thêm địa chỉ GitHub Pages vào Authorized JavaScript origins</h3>
+          <p>Trong OAuth Client vừa tạo, tìm <b>Authorized JavaScript origins</b> và thêm đúng địa chỉ website của app.</p>
+          <div class="oauth-origin-row">
+            <input id="oauthOriginValue" type="text" readonly>
+            <button id="oauthCopyOriginBtn" class="btn" type="button">📋 Copy</button>
+          </div>
+          <div class="oauth-mini-help">Ví dụ: <code>https://minhvukgh1979-ux.github.io</code>. Không thêm dấu <code>/</code> ở cuối.</div>
+          <label class="oauth-check"><input id="oauthOriginDone" type="checkbox"> Tôi đã thêm origin này vào Google Cloud</label>
+          <button id="oauthWizardNext6" class="btn btn-primary" type="button">Tiếp tục →</button>
+        </div>
+
+        <div class="oauth-wizard-panel hidden" data-owpanel="7">
+          <div class="oauth-step-number">7</div>
+          <h3>Đưa Client ID vào app</h3>
+          <p>Copy Client ID từ Google Cloud rồi dán vào ô dưới đây.</p>
+          <input id="oauthWizardClientId" type="text" placeholder="123456789012-xxxx.apps.googleusercontent.com" autocomplete="off">
+          <button id="oauthWizardSaveClientBtn" class="btn btn-primary" type="button">💾 Lưu Client ID →</button>
+          <div id="oauthWizardClientStatus" class="oauth-status"></div>
+        </div>
+
+        <div class="oauth-wizard-panel hidden" data-owpanel="8">
+          <div class="oauth-step-number">✓</div>
+          <h3>Kiểm tra quyền Google Drive</h3>
+          <p>App sẽ mở hộp thoại Google. Chọn đúng account <b id="oauthFinalAccountLabel"></b> và cấp quyền Drive.</p>
+          <button id="oauthWizardTestBtn" class="btn btn-primary" type="button">🔐 Đăng nhập & kiểm tra OAuth</button>
+          <div id="oauthWizardFinalStatus" class="oauth-status"></div>
+          <div class="oauth-note">✓ Khi báo OAuth thành công, máy này đã sẵn sàng đọc/ghi <code>app-config.json</code>.</div>
+        </div>
       </div>
 
       <div class="shared-config-box">

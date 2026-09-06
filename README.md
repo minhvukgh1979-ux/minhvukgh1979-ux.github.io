@@ -262,3 +262,12 @@ OAuth Client ID có thể được dùng bởi app trên cùng domain. Việc **
 ## Lưu ý bảo mật
 
 `app-config.json` chứa API Key theo yêu cầu của thiết kế hiện tại. Không đặt file này trong folder công khai cho người lạ. OAuth token không được ghi vào `app-config.json`.
+
+
+## OAuth Client ID trong app
+
+Phần OAuth Client ID hiện hiển thị dạng wizard giống quy trình `➕ Thêm Google Account mới`:
+
+**1 Account → 2 Project → 3 Drive API → 4 Consent → 5 Client ID → 6 Origin → 7 Nhập vào app → 8 Kiểm tra**
+
+App mở đúng trang Google Cloud ở từng bước, tự lấy `window.location.origin` làm Authorized JavaScript origin để người dùng copy, lưu Client ID và thử OAuth ngay trong app.

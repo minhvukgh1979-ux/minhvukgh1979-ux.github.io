@@ -125,48 +125,135 @@ function migrateOldConfigIfNeeded() {
 
 
 
-// ================= GOOGLE OAUTH SETUP UI =================
-function initGoogleOAuthSetupUI() {
-  const input = document.getElementById('googleClientIdInput');
-  const saveBtn = document.getElementById('saveGoogleClientIdBtn');
-  const testBtn = document.getElementById('testGoogleOAuthBtn');
-  const status = document.getElementById('googleOAuthStatus');
-  if (!input || !status) return;
 
-  input.value = getGoogleClientId();
+// ================= GOOGLE OAUTH WIZARD UI =================
+let oauthWizardStep = 1;
+let oauthWizardAccountValue = '';
 
-  document.getElementById('oauthConsoleBtn')?.addEventListener('click', function() {
-    window.open('https://console.cloud.google.com/', '_blank', 'noopener,noreferrer');
+function oauthWizardShowStep(step) {
+  oauthWizardStep = step;
+  const box = document.querySelector('.oauth-wizard-box');
+  if (!box) return;
+  box.querySelectorAll('[data-owpanel]').forEach(function(p) {
+    p.classList.toggle('hidden', Number(p.dataset.owpanel) !== step);
   });
-  document.getElementById('oauthConsentBtn')?.addEventListener('click', function() {
-    window.open('https://console.cloud.google.com/apis/credentials/consent', '_blank', 'noopener,noreferrer');
+  box.querySelectorAll('[data-owstep]').forEach(function(s) {
+    const n = Number(s.dataset.owstep);
+    s.classList.toggle('active', n === step);
+    s.classList.toggle('done', n < step);
   });
-  document.getElementById('oauthCredentialsBtn')?.addEventListener('click', function() {
-    window.open('https://console.cloud.google.com/apis/credentials', '_blank', 'noopener,noreferrer');
+  if (step === 6) {
+    const origin = window.location.origin;
+    const originInput = document.getElementById('oauthOriginValue');
+    if (originInput) originInput.value = origin;
+  }
+  if (step === 8) {
+    const finalLabel = document.getElementById('oauthFinalAccountLabel');
+    if (finalLabel) finalLabel.textContent = oauthWizardAccountValue;
+  }
+}
+
+function openOAuthWizard() {
+  const box = document.querySelector('.oauth-wizard-box');
+  if (!box) return;
+  oauthWizardStep = 1;
+  oauthWizardAccountValue = '';
+  const a=document.getElementById('oauthWizardAccount'); if(a) a.value='';
+  const c=document.getElementById('oauthWizardClientId'); if(c) c.value=getGoogleClientId();
+  const s=document.getElementById('oauthWizardClientStatus'); if(s) s.textContent='';
+  const fs=document.getElementById('oauthWizardFinalStatus'); if(fs) fs.textContent='';
+  const checks=box.querySelectorAll('input[type="checkbox"]'); checks.forEach(x=>x.checked=false);
+  box.classList.remove('hidden');
+  oauthWizardShowStep(1);
+  box.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function closeOAuthWizard() {
+  document.querySelector('.oauth-wizard-box')?.classList.add('hidden');
+}
+
+function oauthRequireCheck(id, message) {
+  const el=document.getElementById(id);
+  if (!el?.checked) { alert(message); return false; }
+  return true;
+}
+
+function initOAuthWizardUI() {
+  const box=document.querySelector('.oauth-wizard-box');
+  if (!box) return;
+
+  // Open wizard automatically the first time OAuth Client ID is not configured.
+  if (!getGoogleClientId()) box.classList.remove('hidden');
+  else box.classList.add('hidden');
+
+  document.getElementById('closeOAuthWizardBtn')?.addEventListener('click', closeOAuthWizard);
+
+  document.getElementById('oauthWizardNext1')?.addEventListener('click', function() {
+    const email=document.getElementById('oauthWizardAccount').value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      alert('Vui lòng nhập đúng Google Account/Gmail.');
+      return;
+    }
+    oauthWizardAccountValue=email;
+    document.getElementById('oauthWizardAccountLabel').textContent=email;
+    oauthWizardShowStep(2);
   });
 
-  saveBtn?.addEventListener('click', function() {
-    const id = input.value.trim();
-    if (!id || !id.includes('.apps.googleusercontent.com')) {
-      status.textContent = '⚠ Client ID không đúng định dạng. Hãy dán OAuth Client ID kết thúc bằng .apps.googleusercontent.com';
+  document.getElementById('oauthOpenCloudBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/','_blank','noopener,noreferrer'));
+  document.getElementById('oauthCreateProjectBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/projectcreate','_blank','noopener,noreferrer'));
+  document.getElementById('oauthWizardNext2')?.addEventListener('click',function(){
+    if(oauthRequireCheck('oauthProjectDone','Hãy xác nhận bạn đã chọn/tạo Project bằng account mới.')) oauthWizardShowStep(3);
+  });
+
+  document.getElementById('oauthOpenDriveApiBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/apis/library/drive.googleapis.com','_blank','noopener,noreferrer'));
+  document.getElementById('oauthWizardNext3')?.addEventListener('click',function(){
+    if(oauthRequireCheck('oauthDriveDone','Hãy xác nhận Google Drive API đã được bật.')) oauthWizardShowStep(4);
+  });
+
+  document.getElementById('oauthOpenConsentBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/apis/credentials/consent','_blank','noopener,noreferrer'));
+  document.getElementById('oauthWizardNext4')?.addEventListener('click',function(){
+    if(oauthRequireCheck('oauthConsentDone','Hãy xác nhận Consent Screen đã được cấu hình.')) oauthWizardShowStep(5);
+  });
+
+  document.getElementById('oauthOpenCredentialsBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/apis/credentials','_blank','noopener,noreferrer'));
+  document.getElementById('oauthWizardNext5')?.addEventListener('click',function(){
+    if(oauthRequireCheck('oauthClientDone','Hãy xác nhận OAuth Client ID Web application đã được tạo.')) oauthWizardShowStep(6);
+  });
+
+  document.getElementById('oauthCopyOriginBtn')?.addEventListener('click',async function(){
+    const v=document.getElementById('oauthOriginValue').value;
+    try { await navigator.clipboard.writeText(v); this.textContent='✓ Đã copy'; setTimeout(()=>this.textContent='📋 Copy',1200); }
+    catch(e){ alert('Không copy tự động được. Hãy copy origin đang hiển thị.'); }
+  });
+  document.getElementById('oauthWizardNext6')?.addEventListener('click',function(){
+    if(oauthRequireCheck('oauthOriginDone','Hãy thêm Authorized JavaScript origin vào OAuth Client.')) oauthWizardShowStep(7);
+  });
+
+  document.getElementById('oauthWizardSaveClientBtn')?.addEventListener('click',function(){
+    const id=document.getElementById('oauthWizardClientId').value.trim();
+    const status=document.getElementById('oauthWizardClientStatus');
+    if(!id || !id.includes('.apps.googleusercontent.com')){
+      status.textContent='⚠ Client ID không đúng định dạng.';
       return;
     }
     setGoogleClientId(id);
-    status.textContent = '✓ Đã lưu OAuth Client ID trên máy này.';
+    status.textContent='✓ Đã lưu Client ID. Tiếp tục kiểm tra OAuth.';
+    setTimeout(()=>oauthWizardShowStep(8),350);
   });
 
-  testBtn?.addEventListener('click', async function() {
-    try {
-      status.textContent = '⏳ Đang mở đăng nhập Google...';
+  document.getElementById('oauthWizardTestBtn')?.addEventListener('click',async function(){
+    const status=document.getElementById('oauthWizardFinalStatus');
+    try{
+      status.textContent='⏳ Đang mở cửa sổ Google...';
       await requestDriveOAuthToken();
-      status.textContent = '✓ OAuth thành công. Máy này đã được cấp quyền Google Drive cho app.';
-    } catch (e) {
-      status.textContent = '✗ OAuth chưa thành công: ' + (e.message || String(e));
+      status.textContent='✓ OAuth thành công! Đã cấp quyền Google Drive cho app.';
+    }catch(e){
+      status.textContent='✗ OAuth chưa thành công: '+(e.message||String(e));
     }
   });
 }
 
-document.addEventListener('DOMContentLoaded', initGoogleOAuthSetupUI);
+document.addEventListener('DOMContentLoaded', initOAuthWizardUI);
 
 // ================= SHARED DRIVE CONFIG =================
 // File dùng chung trong folder Drive: app-config.json
