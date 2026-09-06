@@ -172,6 +172,24 @@
       </div>
 
 
+
+      <div class="shared-config-box">
+        <div class="shared-config-title">☁️ Đồng bộ cấu hình chung qua Google Drive</div>
+        <div class="shared-config-help">
+          App có thể lưu <b>toàn bộ account + API Key + folder</b> vào một file
+          <code>app-config.json</code> trong folder Drive dùng chung. Máy khác chỉ cần
+          mở app và đọc file này để có cấu hình mới nhất.
+          <br><b>Lưu ý:</b> API Key chỉ có thể đọc/ghi file Drive khi bạn cấp quyền Google
+          cho app; API Key đơn thuần không có quyền ghi Drive.
+        </div>
+        <div class="shared-config-row">
+          <input id="sharedConfigFolderLink" type="url" placeholder="Link folder Drive dùng để lưu app-config.json">
+          <button id="sharedConfigLoadBtn" class="btn" type="button">☁️ Đọc cấu hình</button>
+          <button id="sharedConfigSaveBtn" class="btn btn-primary" type="button">☁️ Lưu cấu hình chung</button>
+        </div>
+        <div id="sharedConfigStatus" class="shared-config-status"></div>
+      </div>
+
       <div class="settings-actions">
         <button id="saveBtn" class="btn btn-primary" tabindex="0">Lưu cấu hình</button>
         <button id="closeSettingsBtn" class="btn" tabindex="0">Đóng</button>

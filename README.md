@@ -153,3 +153,26 @@ Giao diện đã được làm lại đầy đủ hơn:
 App không copy API Key của account cũ. Mỗi account có cấu hình `googleAccount + apiKey + folderLink` riêng.
 
 Google không cho GitHub Pages tự đăng nhập và tự tạo Project/API Key thay người dùng; vì vậy các thao tác xác nhận/tạo trên Google Cloud vẫn cần người dùng thực hiện, nhưng app mở đúng trang và dẫn theo thứ tự.
+
+### Lưu cấu hình
+Account được lưu vào `localStorage` của đúng domain GitHub Pages, đồng thời có bản sao dự phòng. Wizard bước cuối lưu ngay, không cần thao tác thêm. Khi mở lại `⚙️`, app đọc lại danh sách đã lưu và giữ cả Google Account, API Key, tên và Folder.
+
+
+## Đồng bộ toàn bộ account bằng một file trên Google Drive
+
+App hỗ trợ file `app-config.json` nằm trong một folder Drive dùng chung.
+
+### Cách dùng
+1. Tạo/chọn một folder Drive dùng làm **folder cấu hình chung**.
+2. Trong app → ⚙️ → phần `☁️ Đồng bộ cấu hình chung`.
+3. Dán link folder.
+4. Lần đầu, cấu hình Google OAuth Client ID trong app (Google OAuth là bắt buộc để **ghi** file; API Key chỉ đọc dữ liệu công khai và không có quyền ghi Drive).
+5. Bấm `☁️ Lưu cấu hình chung`.
+6. Máy khác mở app → dán cùng link folder → `☁️ Đọc cấu hình`.
+
+`app-config.json` chứa toàn bộ `googleAccount`, `apiKey`, `label`, `folderLink`. Vì vậy máy mới đọc file sẽ có trạng thái account mới nhất.
+
+### Vì sao cần OAuth?
+Google Drive API Key không có quyền sửa file Drive. Muốn app tự tạo/cập nhật `app-config.json`, người dùng phải cấp OAuth token với quyền Drive. Không có cách an toàn để GitHub Pages tự ghi Drive chỉ bằng API Key.
+
+**Cảnh báo:** nếu `app-config.json` nằm trong folder mà nhiều người có thể đọc, API Key cũng sẽ nằm trong đó. Chỉ dùng folder cấu hình cho những người bạn tin cậy; tốt nhất không chia sẻ file cấu hình cho người ngoài.

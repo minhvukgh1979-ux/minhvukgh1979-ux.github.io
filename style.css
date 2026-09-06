@@ -524,3 +524,12 @@ select { max-width: 220px; cursor: pointer; }
 .wizard-note, .wizard-status, .wizard-summary { margin-top:10px; padding:9px; border-radius:8px; background:rgba(255,255,255,.045); font-size:12px; line-height:1.55; }
 .wizard-status { min-height:18px; }
 .wizard-summary { display:grid; gap:7px; }
+
+.account-row input[type="email"] { width:100%; box-sizing:border-box; }
+
+.shared-config-box{margin-top:14px;padding:13px;border:1px solid #3b4656;border-radius:12px;background:rgba(20,27,36,.98)}
+.shared-config-title{font-weight:700;font-size:14px}
+.shared-config-help{margin-top:5px;color:var(--text-dim);font-size:12px;line-height:1.55}
+.shared-config-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.shared-config-row input{flex:1 1 280px;min-width:200px}
+.shared-config-status{margin-top:8px;font-size:12px;color:var(--text-dim);min-height:18px}

@@ -44,7 +44,8 @@ let swRegistration = null;
 
 const LS_KEY_API = 'drivetv_api_key';             // cũ - chỉ dùng để migrate 1 lần
 const LS_KEY_FOLDER_LINK = 'drivetv_folder_link'; // cũ - chỉ dùng để migrate 1 lần
-const LS_KEY_ACCOUNTS = 'drivetv_accounts';       // MỚI: [{label, apiKey, folderLink}, ...]
+const LS_KEY_ACCOUNTS = 'drivetv_accounts';       // [{googleAccount,label,apiKey,folderLink}, ...]
+const LS_KEY_ACCOUNTS_BACKUP = 'drivetv_accounts_backup'; // bản sao dự phòng local
 const LS_KEY_META = 'drivetv_meta';         // {key: {title, favorite, hidden}}
 const LS_KEY_PROGRESS = 'drivetv_progress'; // {key: {time, duration}}
 
@@ -122,25 +123,298 @@ function migrateOldConfigIfNeeded() {
   }
 }
 
+
+// ================= SHARED DRIVE CONFIG =================
+// File dùng chung trong folder Drive: app-config.json
+const SHARED_CONFIG_FILE_NAME = 'app-config.json';
+const LS_KEY_SHARED_CONFIG_FOLDER = 'drivetv_shared_config_folder';
+const LS_KEY_GOOGLE_CLIENT_ID = 'drivetv_google_client_id';
+
+let sharedConfigFileId = null;
+let googleAccessToken = null;
+
+function getSharedConfigFolder() {
+  return localStorage.getItem(LS_KEY_SHARED_CONFIG_FOLDER) || '';
+}
+
+function setSharedConfigFolder(v) {
+  localStorage.setItem(LS_KEY_SHARED_CONFIG_FOLDER, v || '');
+}
+
+function extractDriveFolderId(link) {
+  const m = String(link || '').match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : '';
+}
+
+function getGoogleClientId() {
+  return localStorage.getItem(LS_KEY_GOOGLE_CLIENT_ID) || '';
+}
+
+function setGoogleClientId(v) {
+  localStorage.setItem(LS_KEY_GOOGLE_CLIENT_ID, (v || '').trim());
+}
+
+function loadGoogleIdentityScript() {
+  return new Promise(function(resolve, reject) {
+    if (window.google?.accounts?.oauth2) return resolve();
+    const old = document.querySelector('script[data-google-identity]');
+    if (old) {
+      old.addEventListener('load', resolve, {once:true});
+      old.addEventListener('error', reject, {once:true});
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.async = true;
+    s.defer = true;
+    s.dataset.googleIdentity = '1';
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function requestDriveOAuthToken() {
+  await loadGoogleIdentityScript();
+  const clientId = getGoogleClientId();
+  if (!clientId) {
+    throw new Error('Chưa có Google OAuth Client ID. Vào cấu hình và nhập Client ID để cho phép app đọc/ghi app-config.json trên Drive.');
+  }
+  return new Promise(function(resolve, reject) {
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive',
+      callback: function(resp) {
+        if (resp && resp.access_token) {
+          googleAccessToken = resp.access_token;
+          resolve(resp.access_token);
+        } else {
+          reject(new Error('Google không cấp quyền Drive.'));
+        }
+      },
+      error_callback: function(err) {
+        reject(new Error('Google OAuth lỗi: ' + (err?.message || 'không xác định')));
+      }
+    });
+    client.requestAccessToken({prompt: ''});
+  });
+}
+
+async function driveFetch(url, options) {
+  const token = await requestDriveOAuthToken();
+  const headers = Object.assign({}, options?.headers || {}, {
+    Authorization: 'Bearer ' + token
+  });
+  return fetch(url, Object.assign({}, options || {}, {headers}));
+}
+
+async function findSharedConfigFile(folderId) {
+  const q = encodeURIComponent(
+    "'" + folderId + "' in parents and name = '" + SHARED_CONFIG_FILE_NAME + "' and trashed = false"
+  );
+  const r = await driveFetch(
+    'https://www.googleapis.com/drive/v3/files?q=' + q +
+    '&fields=files(id,name,modifiedTime,mimeType)&pageSize=10'
+  );
+  if (!r.ok) throw new Error('Không tìm được app-config.json (' + r.status + ')');
+  const data = await r.json();
+  return data.files?.[0] || null;
+}
+
+async function readSharedConfigFromDrive(folderLink) {
+  const folderId = extractDriveFolderId(folderLink);
+  if (!folderId) throw new Error('Link folder Drive không hợp lệ.');
+  const file = await findSharedConfigFile(folderId);
+  if (!file) throw new Error('Chưa có app-config.json trong folder này.');
+  sharedConfigFileId = file.id;
+  const r = await driveFetch(
+    'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?alt=media'
+  );
+  if (!r.ok) throw new Error('Không đọc được app-config.json (' + r.status + ')');
+  const config = await r.json();
+  if (!Array.isArray(config.accounts)) throw new Error('app-config.json không đúng định dạng.');
+  return {config, file};
+}
+
+async function createSharedConfigFile(folderId, config) {
+  const metadata = {
+    name: SHARED_CONFIG_FILE_NAME,
+    parents: [folderId],
+    mimeType: 'application/json'
+  };
+  const boundary = '-------DriveTVBoundary' + Date.now();
+  const body =
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify(metadata) + '\r\n' +
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json\r\n\r\n' +
+    JSON.stringify(config, null, 2) + '\r\n' +
+    '--' + boundary + '--';
+
+  const r = await driveFetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+    {
+      method:'POST',
+      headers:{'Content-Type':'multipart/related; boundary=' + boundary},
+      body:body
+    }
+  );
+  if (!r.ok) throw new Error('Không tạo được app-config.json (' + r.status + ')');
+  return await r.json();
+}
+
+async function updateSharedConfigFile(fileId, config) {
+  const r = await driveFetch(
+    'https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(fileId) + '?uploadType=media',
+    {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(config, null, 2)
+    }
+  );
+  if (!r.ok) throw new Error('Không cập nhật được app-config.json (' + r.status + ')');
+  return await r.json();
+}
+
+async function saveAccountsToSharedDrive(folderLink) {
+  const folderId = extractDriveFolderId(folderLink);
+  if (!folderId) throw new Error('Link folder Drive dùng để lưu cấu hình không hợp lệ.');
+
+  const accounts = getAccounts();
+  if (!accounts.length) throw new Error('Chưa có account để lưu.');
+
+  const config = {
+    schemaVersion: 1,
+    updatedAt: new Date().toISOString(),
+    accounts: accounts
+  };
+
+  const existing = await findSharedConfigFile(folderId);
+  let result;
+  if (existing) {
+    sharedConfigFileId = existing.id;
+    result = await updateSharedConfigFile(existing.id, config);
+  } else {
+    result = await createSharedConfigFile(folderId, config);
+    sharedConfigFileId = result.id;
+  }
+
+  setSharedConfigFolder(folderLink);
+  return result;
+}
+
+async function loadAccountsFromSharedDrive(folderLink, silent) {
+  const result = await readSharedConfigFromDrive(folderLink);
+  const normalized = result.config.accounts.map(normalizeAccount).filter(function(a) {
+    return a.apiKey && a.folderLink;
+  });
+  if (!normalized.length) throw new Error('File cấu hình không có account hợp lệ.');
+
+  saveAccounts(normalized);
+  accountDraftRows = getAccounts().map(function(a) {
+    return {
+      googleAccount:a.googleAccount || '',
+      label:a.label || '',
+      apiKey:a.apiKey || '',
+      folderLink:a.folderLink || ''
+    };
+  });
+  setSharedConfigFolder(folderLink);
+  renderAccountRows();
+
+  if (!silent) {
+    sharedConfigStatus.textContent =
+      '✓ Đã đọc ' + normalized.length + ' account. Cập nhật lúc ' +
+      (result.file.modifiedTime ? new Date(result.file.modifiedTime).toLocaleString() : 'vừa xong') + '.';
+  }
+  return normalized;
+}
+
+async function initSharedConfigUI() {
+  const input = document.getElementById('sharedConfigFolderLink');
+  const status = document.getElementById('sharedConfigStatus');
+  const loadBtn = document.getElementById('sharedConfigLoadBtn');
+  const saveBtnShared = document.getElementById('sharedConfigSaveBtn');
+  if (!input || !status) return;
+  input.value = getSharedConfigFolder();
+
+  loadBtn?.addEventListener('click', async function() {
+    try {
+      status.textContent = '⏳ Đang đăng nhập Google và đọc app-config.json...';
+      await loadAccountsFromSharedDrive(input.value.trim());
+    } catch(e) {
+      status.textContent = '✗ ' + (e.message || String(e));
+    }
+  });
+
+  saveBtnShared?.addEventListener('click', async function() {
+    try {
+      status.textContent = '⏳ Đang đăng nhập Google và lưu cấu hình...';
+      await saveAccountsToSharedDrive(input.value.trim());
+      status.textContent = '✓ Đã lưu toàn bộ account vào app-config.json. Máy khác có thể đọc file này.';
+    } catch(e) {
+      status.textContent = '✗ ' + (e.message || String(e));
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initSharedConfigUI);
+
+function normalizeAccount(a) {
+  return {
+    googleAccount: String((a && a.googleAccount) || '').trim(),
+    label: String((a && a.label) || '').trim(),
+    apiKey: String((a && a.apiKey) || '').trim(),
+    folderLink: String((a && a.folderLink) || '').trim()
+  };
+}
+
 function getAccounts() {
   migrateOldConfigIfNeeded();
   let list = [];
-  try { list = JSON.parse(localStorage.getItem(LS_KEY_ACCOUNTS) || '[]'); }
-  catch (e) { list = []; }
-  if (!Array.isArray(list)) list = [];
+  try {
+    list = JSON.parse(localStorage.getItem(LS_KEY_ACCOUNTS) || '[]');
+  } catch (e) {
+    list = [];
+  }
+  if (!Array.isArray(list) || !list.length) {
+    try {
+      list = JSON.parse(localStorage.getItem(LS_KEY_ACCOUNTS_BACKUP) || '[]');
+    } catch (e) {
+      list = [];
+    }
+  }
 
-  list = list.filter(function (a) { return a && a.apiKey && a.folderLink; });
+  list = list.map(normalizeAccount).filter(function (a) {
+    return a.apiKey && a.folderLink;
+  });
 
   if (list.length === 0) {
-    // Chưa có gì lưu trong trình duyệt -> dùng cấu hình mặc định điền
-    // sẵn trong code (DEFAULT_ACCOUNTS ở đầu file).
-    list = DEFAULT_ACCOUNTS.filter(function (a) { return a.apiKey && a.folderLink; });
+    list = DEFAULT_ACCOUNTS.map(normalizeAccount).filter(function (a) {
+      return a.apiKey && a.folderLink;
+    });
   }
   return list;
 }
 
 function saveAccounts(accounts) {
-  localStorage.setItem(LS_KEY_ACCOUNTS, JSON.stringify(accounts));
+  const clean = accounts.map(normalizeAccount).filter(function (a) {
+    return a.apiKey && a.folderLink;
+  });
+  const json = JSON.stringify(clean);
+  try {
+    localStorage.setItem(LS_KEY_ACCOUNTS, json);
+    localStorage.setItem(LS_KEY_ACCOUNTS_BACKUP, json);
+    // Đọc lại ngay để chắc chắn trình duyệt đã ghi thành công.
+    const verify = JSON.parse(localStorage.getItem(LS_KEY_ACCOUNTS) || '[]');
+    if (!Array.isArray(verify) || verify.length !== clean.length) {
+      throw new Error('Không xác minh được dữ liệu đã lưu');
+    }
+  } catch (e) {
+    console.error('saveAccounts failed', e);
+    throw new Error('Trình duyệt không cho phép lưu cấu hình. Hãy kiểm tra quyền lưu dữ liệu của trang GitHub Pages.');
+  }
 }
 
 function isConfigured() {
@@ -723,16 +997,34 @@ document.getElementById('wizardStep5Next')?.addEventListener('click', function()
 });
 
 document.getElementById('wizardFinishBtn')?.addEventListener('click', function() {
-  accountDraftRows.push({
-    label: accountWizardData.label,
+  const newAccount = {
     googleAccount: accountWizardData.googleAccount,
+    label: accountWizardData.label,
     apiKey: accountWizardData.apiKey,
     folderLink: accountWizardData.folderLink
+  };
+
+  // Wizard hoàn tất là LƯU THẬT ngay, không còn trạng thái nháp.
+  const existing = getAccounts().filter(function(a) {
+    return (a.googleAccount || '').toLowerCase() !== newAccount.googleAccount.toLowerCase();
   });
-  renderAccountRows();
-  closeAccountWizard();
-  if (typeof settingsStatus !== 'undefined' && settingsStatus) {
-    settingsStatus.textContent = '✓ Đã thêm ' + accountWizardData.googleAccount + '. Bấm Lưu cấu hình để áp dụng.';
+  try {
+    saveAccounts(existing.concat([newAccount]));
+    accountDraftRows = getAccounts().map(function(a) {
+      return {
+        googleAccount: a.googleAccount || '',
+        label: a.label || '',
+        apiKey: a.apiKey || '',
+        folderLink: a.folderLink || ''
+      };
+    });
+    closeAccountWizard();
+    renderAccountRows();
+    showScreen('grid');
+    loadVideos();
+    alert('✓ Đã lưu vĩnh viễn account ' + newAccount.googleAccount + ' trên trình duyệt này.');
+  } catch (err) {
+    alert('✗ Không lưu được account: ' + (err.message || String(err)));
   }
 });
 
@@ -758,6 +1050,13 @@ function renderAccountRows() {
     labelInput.value = row.label || '';
     labelInput.setAttribute('tabindex', '0');
     labelInput.addEventListener('input', function () { row.label = labelInput.value; });
+
+    const googleInput = document.createElement('input');
+    googleInput.type = 'email';
+    googleInput.placeholder = 'Google Account (vd. minhvukgh1977@gmail.com)';
+    googleInput.value = row.googleAccount || '';
+    googleInput.setAttribute('tabindex', '0');
+    googleInput.addEventListener('input', function () { row.googleAccount = googleInput.value; });
 
     const keyInput = document.createElement('input');
     keyInput.type = 'text';
@@ -828,11 +1127,12 @@ function renderAccountRows() {
     removeBtn.setAttribute('tabindex', '0');
     removeBtn.addEventListener('click', function () {
       accountDraftRows.splice(idx, 1);
-      if (accountDraftRows.length === 0) accountDraftRows.push({ label: '', apiKey: '', folderLink: '' });
+      if (accountDraftRows.length === 0) accountDraftRows.push({ googleAccount: '', label: '', apiKey: '', folderLink: '' });
       renderAccountRows();
     });
 
     div.appendChild(labelWrap);
+    div.appendChild(googleInput);
     div.appendChild(labelInput);
     div.appendChild(keyInput);
     div.appendChild(folderInput);
@@ -845,7 +1145,7 @@ function renderAccountRows() {
 function openSettings() {
   const accounts = getAccounts();
   accountDraftRows = accounts.length > 0
-    ? accounts.map(function (a) { return { label: a.label || '', apiKey: a.apiKey || '', folderLink: a.folderLink || '' }; })
+    ? accounts.map(function (a) { return { googleAccount: a.googleAccount || '', label: a.label || '', apiKey: a.apiKey || '', folderLink: a.folderLink || '' }; })
     : [{ label: '', apiKey: '', folderLink: '' }];
   renderAccountRows();
   settingsError.textContent = '';
@@ -865,12 +1165,8 @@ closeSettingsBtn.addEventListener('click', function () {
 
 if (addAccountBtn) {
   addAccountBtn.addEventListener('click', function () {
-    // Tự điền sẵn API Key của dòng cuối cùng (thường dùng chung được
-    // cho mọi tài khoản, vì key gắn với 1 project Google Cloud chứ
-    // không gắn với tài khoản Drive nào) - đỡ phải gõ lại mỗi lần thêm.
-    const lastRow = accountDraftRows[accountDraftRows.length - 1];
-    const reuseApiKey = lastRow ? (lastRow.apiKey || '') : '';
-    accountDraftRows.push({ label: '', apiKey: reuseApiKey, folderLink: '' });
+    // Account mới phải có cấu hình riêng. KHÔNG tự lấy API Key của account cũ.
+    accountDraftRows.push({ googleAccount: '', label: '', apiKey: '', folderLink: '' });
     renderAccountRows();
     const rows = accountsListEl.querySelectorAll('.account-row');
     const lastRowEl = rows[rows.length - 1];
@@ -883,22 +1179,34 @@ if (addAccountBtn) {
 
 saveBtn.addEventListener('click', function () {
   const cleaned = accountDraftRows.map(function (r) {
-    return { label: (r.label || '').trim(), apiKey: (r.apiKey || '').trim(), folderLink: (r.folderLink || '').trim() };
+    return {
+      googleAccount: (r.googleAccount || '').trim(),
+      label: (r.label || '').trim(),
+      apiKey: (r.apiKey || '').trim(),
+      folderLink: (r.folderLink || '').trim()
+    };
   });
-  // Bỏ các dòng hoàn toàn trống (không đụng tới), chỉ giữ dòng có ít
-  // nhất API Key hoặc link folder đã điền.
-  const nonEmpty = cleaned.filter(function (r) { return r.apiKey || r.folderLink; });
-  const valid = nonEmpty.filter(function (r) { return r.apiKey && r.folderLink; });
+  const nonEmpty = cleaned.filter(function (r) {
+    return r.googleAccount || r.label || r.apiKey || r.folderLink;
+  });
+  const valid = nonEmpty.filter(function (r) {
+    return r.apiKey && r.folderLink;
+  });
 
   if (valid.length === 0) {
     settingsError.textContent = 'Vui lòng nhập đủ API Key và link folder Google Drive cho ít nhất 1 tài khoản.';
     return;
   }
 
-  saveAccounts(valid);
-  closeSettings();
-  showScreen('grid');
-  loadVideos();
+  try {
+    saveAccounts(valid);
+    settingsError.textContent = '';
+    closeSettings();
+    showScreen('grid');
+    loadVideos();
+  } catch (err) {
+    settingsError.textContent = err.message || String(err);
+  }
 });
 
 // ---------------- Tabs & sort ----------------
