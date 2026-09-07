@@ -97,6 +97,19 @@
       <label for="manifestInput">Link thư mục Google Drive</label>
       <input id="manifestInput" type="text" tabindex="0" placeholder="https://drive.google.com/drive/folders/..." />
 
+      <div id="extraAccountsList"></div>
+
+      <button id="addAccountBtn" class="btn" type="button" tabindex="0">+ Thêm tài khoản dự phòng</button>
+      <p class="hint">
+        Nếu 2 tài khoản chứa cùng bộ phim (đã copy sang nhau), thêm cả
+        2 vào đây — khi tài khoản 1 bị lỗi "download quota exceeded",
+        app tự chuyển qua tài khoản kế tiếp để phát, không cần bạn
+        làm gì thêm. <b>Lưu ý:</b> tài khoản thêm ở đây chỉ lưu trên
+        máy/trình duyệt đang dùng. Muốn tài khoản có sẵn ở mọi máy
+        vĩnh viễn, thêm vào <code>DEFAULT_EXTRA_ACCOUNTS</code> đầu
+        file <code>app.js</code> rồi đẩy lên GitHub.
+      </p>
+
       <label for="proxyUrlInput">Server proxy tại nhà (không bắt buộc)</label>
       <input id="proxyUrlInput" type="text" tabindex="0" placeholder="https://ten-cua-ban.trycloudflare.com" />
 
@@ -106,9 +119,6 @@
       </div>
 
       <p class="hint">
-        Muốn thêm tài khoản dự phòng (tự chuyển khi bị lỗi "download
-        quota exceeded", hiện sẵn ở mọi thiết bị) — sửa trực tiếp
-        <code>DEFAULT_EXTRA_ACCOUNTS</code> đầu file <code>app.js</code>.
         Folder phải để chia sẻ "Bất kỳ ai có đường liên kết - Người
         xem". Có file phụ đề (.srt) cùng tên video sẽ tự động gắn khi
         phát. Bấm phím <b>M</b> để mở lại màn hình này.

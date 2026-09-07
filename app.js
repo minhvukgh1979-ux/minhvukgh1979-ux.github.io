@@ -29,6 +29,7 @@ let swRegistration = null;
 const LS_KEY_API = 'drivetv_api_key';
 const LS_KEY_FOLDER_LINK = 'drivetv_folder_link';
 const LS_KEY_PROXY = 'drivetv_proxy_url'; // URL server proxy tự host (vd Cloudflare Tunnel về máy nhà)
+const LS_KEY_EXTRA_ACCOUNTS = 'drivetv_extra_accounts'; // tài khoản thêm qua giao diện, chỉ lưu trên máy này
 const LS_KEY_META = 'drivetv_meta';         // {fileId: {title, favorite, hidden}}
 const LS_KEY_PROGRESS = 'drivetv_progress'; // {fileId: seconds}
 
@@ -45,6 +46,8 @@ const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const apiKeyInput = document.getElementById('apiKeyInput');
 const manifestInput = document.getElementById('manifestInput');
 const proxyUrlInput = document.getElementById('proxyUrlInput');
+const extraAccountsList = document.getElementById('extraAccountsList');
+const addAccountBtn = document.getElementById('addAccountBtn');
 const saveBtn = document.getElementById('saveBtn');
 const settingsError = document.getElementById('settingsError');
 
@@ -98,10 +101,15 @@ let speedIndex = 2;
 // ---------------- Config helpers ----------------
 
 function getExtraAccounts() {
-  // Tài khoản dự phòng lấy thẳng từ code (DEFAULT_EXTRA_ACCOUNTS) -
-  // để thêm 1 lần là mọi thiết bị/mạng đều thấy ngay, không cần cấu
-  // hình riêng trên từng máy.
-  return DEFAULT_EXTRA_ACCOUNTS.slice();
+  // Gộp 2 nguồn: tài khoản "cứng" trong code (DEFAULT_EXTRA_ACCOUNTS -
+  // có sẵn ở MỌI máy/mạng) + tài khoản thêm qua giao diện Cài đặt
+  // (chỉ lưu riêng trên máy/trình duyệt đang dùng).
+  let fromUI = [];
+  try {
+    fromUI = JSON.parse(localStorage.getItem(LS_KEY_EXTRA_ACCOUNTS) || '[]');
+    if (!Array.isArray(fromUI)) fromUI = [];
+  } catch (e) { fromUI = []; }
+  return DEFAULT_EXTRA_ACCOUNTS.concat(fromUI);
 }
 
 function getConfig() {
@@ -126,10 +134,11 @@ function getConfig() {
   };
 }
 
-function saveConfig(apiKey, folderLink, proxyUrl) {
+function saveConfig(apiKey, folderLink, proxyUrl, extraAccounts) {
   localStorage.setItem(LS_KEY_API, apiKey);
   localStorage.setItem(LS_KEY_FOLDER_LINK, folderLink);
   localStorage.setItem(LS_KEY_PROXY, proxyUrl || '');
+  localStorage.setItem(LS_KEY_EXTRA_ACCOUNTS, JSON.stringify(extraAccounts || []));
 }
 
 function isConfigured() {
@@ -539,13 +548,13 @@ function assToVtt(assText) {
   return vtt;
 }
 
-async function buildSubtitleUrl(video, apiKey) {
-  if (!video.subtitleFileId) return null;
-  const res = await fetch(streamUrl(video.subtitleFileId, apiKey));
+async function buildSubtitleUrl(source) {
+  if (!source || !source.subtitleFileId) return null;
+  const res = await fetch(streamUrl(source.subtitleFileId, source.apiKey));
   if (!res.ok) return null;
   let text = await res.text();
-  if (video.subtitleExt === 'srt') text = srtToVtt(text);
-  else if (video.subtitleExt === 'ass' || video.subtitleExt === 'ssa') text = assToVtt(text);
+  if (source.subtitleExt === 'srt') text = srtToVtt(text);
+  else if (source.subtitleExt === 'ass' || source.subtitleExt === 'ssa') text = assToVtt(text);
   else if (!/^WEBVTT/.test(text.trim())) text = 'WEBVTT\n\n' + text;
   const blob = new Blob([text], { type: 'text/vtt' });
   return URL.createObjectURL(blob);
@@ -560,10 +569,62 @@ function showScreen(name) {
   if (name === 'player') playerScreen.classList.remove('hidden');
 }
 
+// ---------------- Tài khoản dự phòng thêm qua giao diện (chỉ trên máy này) ----------------
+
+function getUIOnlyExtraAccounts() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(LS_KEY_EXTRA_ACCOUNTS) || '[]');
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+
+function renderExtraAccountRows(accounts) {
+  if (!extraAccountsList) return;
+  extraAccountsList.innerHTML = '';
+  accounts.forEach(function (acc, i) {
+    const row = document.createElement('div');
+    row.className = 'account-row';
+    row.innerHTML =
+      '<div class="account-fields">' +
+      '<label>Google Drive API Key (tài khoản thêm ' + (i + 1) + ')</label>' +
+      '<input type="text" class="extraApiKey" placeholder="AIzaSy..." value="' +
+      (acc.apiKey || '').replace(/"/g, '&quot;') + '" />' +
+      '<label>Link thư mục Google Drive (tài khoản thêm ' + (i + 1) + ')</label>' +
+      '<input type="text" class="extraFolderLink" placeholder="https://drive.google.com/drive/folders/..." value="' +
+      (acc.folderLink || '').replace(/"/g, '&quot;') + '" />' +
+      '</div>' +
+      '<button type="button" class="btn removeAccountBtn" tabindex="0">Xoá</button>';
+    row.querySelector('.removeAccountBtn').addEventListener('click', function () {
+      row.remove();
+    });
+    extraAccountsList.appendChild(row);
+  });
+}
+
+function collectExtraAccountsFromUI() {
+  if (!extraAccountsList) return [];
+  const rows = Array.from(extraAccountsList.querySelectorAll('.account-row'));
+  return rows.map(function (row) {
+    return {
+      apiKey: row.querySelector('.extraApiKey').value.trim(),
+      folderLink: row.querySelector('.extraFolderLink').value.trim()
+    };
+  }).filter(function (a) { return a.apiKey && a.folderLink; });
+}
+
+if (addAccountBtn) {
+  addAccountBtn.addEventListener('click', function () {
+    const current = collectExtraAccountsFromUI();
+    current.push({ apiKey: '', folderLink: '' });
+    renderExtraAccountRows(current);
+  });
+}
+
 function openSettings() {
   const c = getConfig();
   apiKeyInput.value = c.apiKey;
   manifestInput.value = c.folderLink;
+  renderExtraAccountRows(getUIOnlyExtraAccounts());
   if (proxyUrlInput) proxyUrlInput.value = c.proxyUrl;
   settingsError.textContent = '';
   settingsScreen.classList.remove('hidden');
@@ -583,11 +644,12 @@ saveBtn.addEventListener('click', function () {
   const apiKey = apiKeyInput.value.trim();
   const folderLink = manifestInput.value.trim();
   const proxyUrl = proxyUrlInput ? proxyUrlInput.value.trim().replace(/\/+$/, '') : '';
+  const extraAccounts = collectExtraAccountsFromUI();
   if (!apiKey || !folderLink) {
     settingsError.textContent = 'Vui lòng nhập đủ API Key và link folder Google Drive.';
     return;
   }
-  saveConfig(apiKey, folderLink, proxyUrl);
+  saveConfig(apiKey, folderLink, proxyUrl, extraAccounts);
   closeSettings();
   showScreen('grid');
   loadVideos();
@@ -762,7 +824,7 @@ async function loadVideos() {
   videoGrid.innerHTML = '';
 
   try {
-    allVideos = await fetchFolderVideos(c.apiKey, c.folderLink);
+    allVideos = await fetchFolderVideos(c.accounts);
     searchInput.value = '';
     applyFilters();
     const firstCard = videoGrid.querySelector('.card');
@@ -867,25 +929,42 @@ function describePlaybackError(status) {
 
 async function openPlayer(rawVideo) {
   const video = decorate(rawVideo);
-  const c = getConfig();
   currentVideo = video;
   clearSubtitle();
   hidePlayerError();
 
   playerTitle.textContent = video.title;
-  const vidUrl = streamUrl(video.fileId, c.apiKey);
   videoPlayer.playbackRate = SPEEDS[speedIndex];
   speedBtn.textContent = SPEEDS[speedIndex] + 'x';
   showScreen('player');
   showControls();
 
-  const check = await checkPlayableUrl(vidUrl);
-  if (!check.ok) {
-    showPlayerError(describePlaybackError(check.status));
+  // Thử lần lượt từng "nguồn" (mỗi tài khoản Drive chứa phim này 1
+  // bản) - nếu tài khoản đầu bị lỗi (vd "download quota exceeded"),
+  // tự động thử tài khoản kế tiếp mà không cần người xem làm gì.
+  const sources = (video.sources && video.sources.length) ? video.sources : [{
+    apiKey: getConfig().apiKey,
+    fileId: video.fileId,
+    subtitleFileId: video.subtitleFileId,
+    subtitleExt: video.subtitleExt
+  }];
+
+  let workingSource = null;
+  let lastStatus = null;
+
+  for (const source of sources) {
+    const url = streamUrl(source.fileId, source.apiKey);
+    const check = await checkPlayableUrl(url);
+    if (check.ok) { workingSource = source; break; }
+    lastStatus = check.status;
+  }
+
+  if (!workingSource) {
+    showPlayerError(describePlaybackError(lastStatus));
     return;
   }
 
-  videoPlayer.src = vidUrl;
+  videoPlayer.src = streamUrl(workingSource.fileId, workingSource.apiKey);
 
   const saved = getProgress(video.fileId);
   if (saved && saved.time > 5 && saved.duration && saved.time < saved.duration - 5) {
@@ -895,9 +974,9 @@ async function openPlayer(rawVideo) {
   videoPlayer.play().catch(function () { /* có thể bị chặn autoplay */ });
   updatePlayPauseIcon();
 
-  if (video.subtitleFileId) {
+  if (workingSource.subtitleFileId) {
     try {
-      const url = await buildSubtitleUrl(video, c.apiKey);
+      const url = await buildSubtitleUrl(workingSource);
       if (url) {
         currentSubtitleUrl = url;
         subtitleTrack.src = url;

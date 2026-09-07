@@ -300,6 +300,34 @@ select { max-width: 220px; cursor: pointer; }
   font-size: 12px;
 }
 
+.account-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 10px;
+}
+
+.account-row .account-fields {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-row .account-fields label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.account-row .account-fields input {
+  margin-bottom: 6px;
+}
+
+.account-row .removeAccountBtn {
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 12px;
+}
+
 .error {
   color: var(--danger);
   font-size: 13px;
