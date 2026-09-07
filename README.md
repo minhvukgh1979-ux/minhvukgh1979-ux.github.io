@@ -65,6 +65,28 @@ Google bắt buộc mọi truy vấn vào Drive API phải xác thực bằng AP
 hoặc đăng nhập (OAuth). API Key là lựa chọn nhẹ nhất — tạo 1 lần, không
 hết hạn, người xem không cần đăng nhập gì cả.
 
+## Thêm tài khoản Drive dự phòng (dùng khi 1 tài khoản bị lỗi quota)
+
+Sửa file **`accounts.json`** ngay trong repo (bấm biểu tượng bút chì ✎
+trên trang GitHub để sửa trực tiếp trên web, không cần cài gì) theo
+mẫu:
+
+```json
+[
+  { "apiKey": "AIzaSy...tài khoản 2...", "folderLink": "https://drive.google.com/drive/folders/...tài khoản 2..." }
+]
+```
+
+Commit lại là xong — **mọi máy/TV mở trang đều tự thấy ngay** từ lần
+tải trang kế tiếp, không cần sửa `app.js`, không cần cấu hình lại
+từng máy. Có thể thêm nhiều tài khoản, mỗi tài khoản 1 dòng
+`{ "apiKey": ..., "folderLink": ... }`, cách nhau bằng dấu phẩy.
+
+(Ngoài ra, trong màn hình Cài đặt ⚙️ của web cũng có nút "+ Thêm tài
+khoản dự phòng" — cách đó tiện để thử nhanh nhưng chỉ lưu riêng trên
+máy/trình duyệt đang dùng, không chia sẻ sang máy khác như
+`accounts.json`.)
+
 ## TV đời cũ không đăng nhập được Google?
 
 Nếu TV chặn hẳn màn hình đăng nhập Google (lỗi "disallowed_useragent"),

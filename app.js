@@ -134,6 +134,37 @@ function getConfig() {
   };
 }
 
+// Tài khoản chia sẻ qua file accounts.json trong repo - sửa file này
+// thẳng trên GitHub (không cần đụng vào code app.js) là MỌI máy mở
+// trang đều tự thấy ngay từ lần tải trang kế tiếp.
+async function fetchSharedAccounts() {
+  try {
+    const res = await fetch('accounts.json?t=' + Date.now()); // chặn cache cũ
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data.filter(function (a) { return a && a.apiKey && a.folderLink; });
+  } catch (e) {
+    return []; // không có file / lỗi mạng -> bỏ qua, không chặn app chạy tiếp
+  }
+}
+
+// Danh sách tài khoản đầy đủ dùng để quét video: tài khoản 1 + code
+// (DEFAULT_EXTRA_ACCOUNTS) + giao diện (localStorage, riêng máy này)
+// + accounts.json (chia sẻ qua GitHub, mọi máy đều thấy).
+async function getAllAccounts() {
+  const c = getConfig();
+  const shared = await fetchSharedAccounts();
+  const seen = new Set();
+  const all = c.accounts.concat(shared).filter(function (a) {
+    const key = a.apiKey + '|' + a.folderLink;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return all;
+}
+
 function saveConfig(apiKey, folderLink, proxyUrl, extraAccounts) {
   localStorage.setItem(LS_KEY_API, apiKey);
   localStorage.setItem(LS_KEY_FOLDER_LINK, folderLink);
@@ -819,12 +850,12 @@ function renderVideos(videos) {
 }
 
 async function loadVideos() {
-  const c = getConfig();
   statusMsg.textContent = 'Đang quét folder Google Drive...';
   videoGrid.innerHTML = '';
 
   try {
-    allVideos = await fetchFolderVideos(c.accounts);
+    const accounts = await getAllAccounts();
+    allVideos = await fetchFolderVideos(accounts);
     searchInput.value = '';
     applyFilters();
     const firstCard = videoGrid.querySelector('.card');
