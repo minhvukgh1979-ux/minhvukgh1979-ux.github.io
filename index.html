@@ -120,6 +120,7 @@
       <div class="settings-tabs" id="settingsTabs">
         <button class="settings-tab active" type="button" data-settings-tab="accounts" tabindex="0">📁 Tài khoản Drive</button>
         <button class="settings-tab" type="button" data-settings-tab="backup" tabindex="0">💾 Sao lưu</button>
+        <button class="settings-tab" type="button" data-settings-tab="sync" tabindex="0">☁️ Đồng bộ Drive</button>
         <button class="settings-tab" type="button" data-settings-tab="shortcuts" tabindex="0">⌨️ Phím tắt</button>
       </div>
 
@@ -264,6 +265,85 @@
             <input id="importConfigInput" type="file" accept="application/json" class="hidden">
           </div>
           <p id="backupMsg" class="hint"></p>
+        </div>
+
+        <div class="settings-panel-content hidden" data-settings-panel="sync">
+          <p class="hint">
+            Tự động lưu file sao lưu (giống hệt file .json ở tab "Sao lưu")
+            lên 1 folder Google Drive do bạn chọn. Mỗi khi bạn đổi cấu hình
+            (thêm/xoá tài khoản, yêu thích, ẩn video, ghi chú...), app tự
+            đẩy bản mới lên Drive; mở app trên máy/TV khác đã bật tính năng
+            này sẽ tự kéo bản mới nhất về, không cần Xuất/Nhập file tay nữa.
+          </p>
+
+          <div id="syncStatusBox" class="wizard-status"></div>
+
+          <div id="syncActiveActions" class="backup-actions hidden">
+            <button id="syncNowBtn" class="btn btn-block" type="button">🔄 Đồng bộ ngay (đẩy bản trên máy này lên Drive)</button>
+            <button id="syncPullBtn" class="btn btn-block" type="button">⬇ Kéo bản trên Drive về máy này</button>
+            <button id="syncDisableBtn" class="btn btn-block" type="button">⛔ Tắt đồng bộ tự động</button>
+          </div>
+
+          <button id="syncEnableBtn" class="btn btn-primary btn-block" type="button">☁️ Bật đồng bộ tự động</button>
+
+          <div id="syncWizard" class="account-wizard hidden">
+            <div class="wizard-head">
+              <div>
+                <strong>☁️ Bật đồng bộ tự động qua Google Drive</strong>
+                <div class="wizard-sub">Dùng chung Google Sign-In đã có sẵn trong app - chỉ cần cấp thêm quyền đọc/ghi Drive, không cần tạo Project hay API Key mới.</div>
+              </div>
+              <button id="closeSyncWizardBtn" class="btn btn-sm" type="button">Đóng</button>
+            </div>
+
+            <div class="wizard-progress">
+              <span data-swstep="1">1. Chọn folder</span>
+              <span data-swstep="2">2. Cấp quyền</span>
+              <span data-swstep="3">3. Kiểm tra</span>
+            </div>
+
+            <div class="wizard-panel" data-spanel="1">
+              <div class="wizard-number">1</div>
+              <h3>Chọn folder Drive để lưu file đồng bộ</h3>
+              <p>
+                Dùng 1 folder bạn có quyền chỉnh sửa (folder riêng tư cũng
+                được - không bắt buộc chia sẻ công khai, vì lần này app
+                đăng nhập thẳng bằng tài khoản Google của bạn để ghi file,
+                không cần API Key). Có thể dùng lại đúng folder chứa phim,
+                hoặc tạo 1 folder mới riêng để chứa file cấu hình.
+              </p>
+              <input id="syncFolderLink" type="url" placeholder="https://drive.google.com/drive/folders/...">
+              <button id="syncStep1Next" class="btn btn-primary" type="button">Tiếp tục →</button>
+            </div>
+
+            <div class="wizard-panel hidden" data-spanel="2">
+              <div class="wizard-number">2</div>
+              <h3>Đăng nhập & cấp quyền Google Drive</h3>
+              <p>Bấm nút bên dưới, chọn đúng tài khoản Google chứa folder ở bước 1, rồi bấm <b>Cho phép</b>.</p>
+              <button id="syncLoginBtn" class="btn api-link-btn" type="button">🔐 Đăng nhập & Cấp quyền Drive</button>
+              <div id="syncLoginStatus" class="wizard-status"></div>
+              <div class="wizard-note">
+                ⚠ Google có thể hiện cảnh báo "Ứng dụng này chưa được xác
+                minh" - đây là bình thường vì app do bạn tự dùng riêng.
+                Bấm <b>Advanced / Nâng cao</b> → <b>Đi tới ... (không an
+                toàn)</b> → <b>Tiếp tục</b> để cấp quyền như bình thường.
+              </div>
+            </div>
+
+            <div class="wizard-panel hidden" data-spanel="3">
+              <div class="wizard-number">3</div>
+              <h3>Kiểm tra & lưu thử</h3>
+              <p>App sẽ thử tạo/ghi file sao lưu vào đúng folder bạn chọn để chắc chắn quyền ghi hoạt động.</p>
+              <button id="syncTestBtn" class="btn api-link-btn" type="button">🔍 Kiểm tra & Lưu thử</button>
+              <div id="syncTestStatus" class="wizard-status"></div>
+              <button id="syncFinishBtn" class="btn btn-primary" type="button" disabled>✓ Bật đồng bộ tự động</button>
+            </div>
+          </div>
+
+          <p class="hint">
+            Lưu ý: đây là đồng bộ 1 chiều-cuốn-chiếu theo thời gian (bản
+            sửa sau cùng thắng), phù hợp khi bạn dùng lần lượt từng máy,
+            không phải chỉnh sửa cùng lúc trên nhiều máy.
+          </p>
         </div>
 
         <div class="settings-panel-content hidden" data-settings-panel="shortcuts">
