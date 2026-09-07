@@ -46,8 +46,9 @@ const LS_KEY_API = 'drivetv_api_key';             // cũ - chỉ dùng để mig
 const LS_KEY_FOLDER_LINK = 'drivetv_folder_link'; // cũ - chỉ dùng để migrate 1 lần
 const LS_KEY_ACCOUNTS = 'drivetv_accounts';       // [{googleAccount,label,apiKey,folderLink}, ...]
 const LS_KEY_ACCOUNTS_BACKUP = 'drivetv_accounts_backup'; // bản sao dự phòng local
-const LS_KEY_META = 'drivetv_meta';         // {key: {title, favorite, hidden}}
-const LS_KEY_PROGRESS = 'drivetv_progress'; // {key: {time, duration}}
+const LS_KEY_META = 'drivetv_meta';         // {key: {title, favorite, hidden, note, watchedManual}}
+const LS_KEY_PROGRESS = 'drivetv_progress'; // {key: {time, duration, updatedAt}}
+const LS_KEY_VIEW = 'drivetv_view';         // 'grid' | 'list'
 
 // ---------------- DOM refs ----------------
 
@@ -65,11 +66,22 @@ const saveBtn = document.getElementById('saveBtn');
 const settingsError = document.getElementById('settingsError');
 
 const searchInput = document.getElementById('searchInput');
+const clearSearchBtn = document.getElementById('clearSearchBtn');
 const sortSelect = document.getElementById('sortSelect');
 const refreshBtn = document.getElementById('refreshBtn');
 const tabsEl = document.getElementById('tabs');
 const videoGrid = document.getElementById('videoGrid');
 const statusMsg = document.getElementById('statusMsg');
+const videoCountBadge = document.getElementById('videoCountBadge');
+const viewToggleBtn = document.getElementById('viewToggleBtn');
+const selectModeBtn = document.getElementById('selectModeBtn');
+const bulkBar = document.getElementById('bulkBar');
+const bulkCount = document.getElementById('bulkCount');
+const bulkFavBtn = document.getElementById('bulkFavBtn');
+const bulkHideBtn = document.getElementById('bulkHideBtn');
+const bulkCancelBtn = document.getElementById('bulkCancelBtn');
+const continueSection = document.getElementById('continueSection');
+const continueRow = document.getElementById('continueRow');
 
 const videoPlayer = document.getElementById('videoPlayer');
 const subtitleTrack = document.getElementById('subtitleTrack');
@@ -79,6 +91,7 @@ const bigPlayBtn = document.getElementById('bigPlayBtn');
 const playerError = document.getElementById('playerError');
 const backBtn = document.getElementById('backBtn');
 const playerTitle = document.getElementById('playerTitle');
+const shortcutsBtn = document.getElementById('shortcutsBtn');
 const seekBar = document.getElementById('seekBar');
 const timeCurrent = document.getElementById('timeCurrent');
 const timeDuration = document.getElementById('timeDuration');
@@ -89,12 +102,17 @@ const muteBtn = document.getElementById('muteBtn');
 const volumeBar = document.getElementById('volumeBar');
 const subtitleBtn = document.getElementById('subtitleBtn');
 const speedBtn = document.getElementById('speedBtn');
+const pipBtn = document.getElementById('pipBtn');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 
 const editTitleInput = document.getElementById('editTitleInput');
+const editNoteInput = document.getElementById('editNoteInput');
+const editWatchedInput = document.getElementById('editWatchedInput');
 const editSaveBtn = document.getElementById('editSaveBtn');
 const editResetBtn = document.getElementById('editResetBtn');
 const editCancelBtn = document.getElementById('editCancelBtn');
+
+const toastContainer = document.getElementById('toastContainer');
 
 // ---------------- State ----------------
 
@@ -108,6 +126,23 @@ let controlsHideTimer = null;
 let progressSaveTimer = null;
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 let speedIndex = 2;
+let bulkModeActive = false;
+let selectedKeys = new Set();
+
+// ---------------- Toast (thông báo nhẹ, thay cho alert) ----------------
+
+function toast(message, type) {
+  if (!toastContainer) { return; }
+  const el = document.createElement('div');
+  el.className = 'toast' + (type === 'ok' ? ' toast-ok' : type === 'err' ? ' toast-err' : '');
+  el.textContent = message;
+  toastContainer.appendChild(el);
+  setTimeout(function () {
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.25s ease';
+    setTimeout(function () { el.remove(); }, 260);
+  }, 3200);
+}
 
 // ---------------- Config helpers ----------------
 
@@ -122,375 +157,6 @@ function migrateOldConfigIfNeeded() {
     saveAccounts([{ label: '', apiKey: oldKey || '', folderLink: oldFolder || '' }]);
   }
 }
-
-
-
-
-// ================= GOOGLE OAUTH WIZARD UI =================
-let oauthWizardStep = 1;
-let oauthWizardAccountValue = '';
-
-function oauthWizardShowStep(step) {
-  oauthWizardStep = step;
-  const box = document.querySelector('.oauth-wizard-box');
-  if (!box) return;
-  box.querySelectorAll('[data-owpanel]').forEach(function(p) {
-    p.classList.toggle('hidden', Number(p.dataset.owpanel) !== step);
-  });
-  box.querySelectorAll('[data-owstep]').forEach(function(s) {
-    const n = Number(s.dataset.owstep);
-    s.classList.toggle('active', n === step);
-    s.classList.toggle('done', n < step);
-  });
-  if (step === 6) {
-    const origin = window.location.origin;
-    const originInput = document.getElementById('oauthOriginValue');
-    if (originInput) originInput.value = origin;
-  }
-  if (step === 8) {
-    const finalLabel = document.getElementById('oauthFinalAccountLabel');
-    if (finalLabel) finalLabel.textContent = oauthWizardAccountValue;
-  }
-}
-
-function openOAuthWizard() {
-  const box = document.querySelector('.oauth-wizard-box');
-  if (!box) return;
-  oauthWizardStep = 1;
-  oauthWizardAccountValue = '';
-  const a=document.getElementById('oauthWizardAccount'); if(a) a.value='';
-  const c=document.getElementById('oauthWizardClientId'); if(c) c.value=getGoogleClientId();
-  const s=document.getElementById('oauthWizardClientStatus'); if(s) s.textContent='';
-  const fs=document.getElementById('oauthWizardFinalStatus'); if(fs) fs.textContent='';
-  const checks=box.querySelectorAll('input[type="checkbox"]'); checks.forEach(x=>x.checked=false);
-  box.classList.remove('hidden');
-  oauthWizardShowStep(1);
-  box.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-
-function closeOAuthWizard() {
-  document.querySelector('.oauth-wizard-box')?.classList.add('hidden');
-}
-
-function oauthRequireCheck(id, message) {
-  const el=document.getElementById(id);
-  if (!el?.checked) { alert(message); return false; }
-  return true;
-}
-
-function initOAuthWizardUI() {
-  const box=document.querySelector('.oauth-wizard-box');
-  if (!box) return;
-
-  // Open wizard automatically the first time OAuth Client ID is not configured.
-  if (!getGoogleClientId()) box.classList.remove('hidden');
-  else box.classList.add('hidden');
-
-  document.getElementById('closeOAuthWizardBtn')?.addEventListener('click', closeOAuthWizard);
-
-  document.getElementById('oauthWizardNext1')?.addEventListener('click', function() {
-    const email=document.getElementById('oauthWizardAccount').value.trim();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      alert('Vui lòng nhập đúng Google Account/Gmail.');
-      return;
-    }
-    oauthWizardAccountValue=email;
-    document.getElementById('oauthWizardAccountLabel').textContent=email;
-    oauthWizardShowStep(2);
-  });
-
-  document.getElementById('oauthOpenCloudBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/','_blank','noopener,noreferrer'));
-  document.getElementById('oauthCreateProjectBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/projectcreate','_blank','noopener,noreferrer'));
-  document.getElementById('oauthWizardNext2')?.addEventListener('click',function(){
-    if(oauthRequireCheck('oauthProjectDone','Hãy xác nhận bạn đã chọn/tạo Project bằng account mới.')) oauthWizardShowStep(3);
-  });
-
-  document.getElementById('oauthOpenDriveApiBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/apis/library/drive.googleapis.com','_blank','noopener,noreferrer'));
-  document.getElementById('oauthWizardNext3')?.addEventListener('click',function(){
-    if(oauthRequireCheck('oauthDriveDone','Hãy xác nhận Google Drive API đã được bật.')) oauthWizardShowStep(4);
-  });
-
-  document.getElementById('oauthOpenConsentBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/apis/credentials/consent','_blank','noopener,noreferrer'));
-  document.getElementById('oauthWizardNext4')?.addEventListener('click',function(){
-    if(oauthRequireCheck('oauthConsentDone','Hãy xác nhận Consent Screen đã được cấu hình.')) oauthWizardShowStep(5);
-  });
-
-  document.getElementById('oauthOpenCredentialsBtn')?.addEventListener('click',()=>window.open('https://console.cloud.google.com/apis/credentials','_blank','noopener,noreferrer'));
-  document.getElementById('oauthWizardNext5')?.addEventListener('click',function(){
-    if(oauthRequireCheck('oauthClientDone','Hãy xác nhận OAuth Client ID Web application đã được tạo.')) oauthWizardShowStep(6);
-  });
-
-  document.getElementById('oauthCopyOriginBtn')?.addEventListener('click',async function(){
-    const v=document.getElementById('oauthOriginValue').value;
-    try { await navigator.clipboard.writeText(v); this.textContent='✓ Đã copy'; setTimeout(()=>this.textContent='📋 Copy',1200); }
-    catch(e){ alert('Không copy tự động được. Hãy copy origin đang hiển thị.'); }
-  });
-  document.getElementById('oauthWizardNext6')?.addEventListener('click',function(){
-    if(oauthRequireCheck('oauthOriginDone','Hãy thêm Authorized JavaScript origin vào OAuth Client.')) oauthWizardShowStep(7);
-  });
-
-  document.getElementById('oauthWizardSaveClientBtn')?.addEventListener('click',function(){
-    const id=document.getElementById('oauthWizardClientId').value.trim();
-    const status=document.getElementById('oauthWizardClientStatus');
-    if(!id || !id.includes('.apps.googleusercontent.com')){
-      status.textContent='⚠ Client ID không đúng định dạng.';
-      return;
-    }
-    setGoogleClientId(id);
-    status.textContent='✓ Đã lưu Client ID. Tiếp tục kiểm tra OAuth.';
-    setTimeout(()=>oauthWizardShowStep(8),350);
-  });
-
-  document.getElementById('oauthWizardTestBtn')?.addEventListener('click',async function(){
-    const status=document.getElementById('oauthWizardFinalStatus');
-    try{
-      status.textContent='⏳ Đang mở cửa sổ Google...';
-      await requestDriveOAuthToken();
-      status.textContent='✓ OAuth thành công! Đã cấp quyền Google Drive cho app.';
-    }catch(e){
-      status.textContent='✗ OAuth chưa thành công: '+(e.message||String(e));
-    }
-  });
-}
-
-document.addEventListener('DOMContentLoaded', initOAuthWizardUI);
-
-// ================= SHARED DRIVE CONFIG =================
-// File dùng chung trong folder Drive: app-config.json
-const SHARED_CONFIG_FILE_NAME = 'app-config.json';
-const LS_KEY_SHARED_CONFIG_FOLDER = 'drivetv_shared_config_folder';
-const LS_KEY_GOOGLE_CLIENT_ID = 'drivetv_google_client_id';
-
-let sharedConfigFileId = null;
-let googleAccessToken = null;
-
-function getSharedConfigFolder() {
-  return localStorage.getItem(LS_KEY_SHARED_CONFIG_FOLDER) || '';
-}
-
-function setSharedConfigFolder(v) {
-  localStorage.setItem(LS_KEY_SHARED_CONFIG_FOLDER, v || '');
-}
-
-function extractDriveFolderId(link) {
-  const m = String(link || '').match(/\/folders\/([a-zA-Z0-9_-]+)/);
-  return m ? m[1] : '';
-}
-
-function getGoogleClientId() {
-  return localStorage.getItem(LS_KEY_GOOGLE_CLIENT_ID) || '';
-}
-
-function setGoogleClientId(v) {
-  localStorage.setItem(LS_KEY_GOOGLE_CLIENT_ID, (v || '').trim());
-}
-
-function loadGoogleIdentityScript() {
-  return new Promise(function(resolve, reject) {
-    if (window.google?.accounts?.oauth2) return resolve();
-    const old = document.querySelector('script[data-google-identity]');
-    if (old) {
-      old.addEventListener('load', resolve, {once:true});
-      old.addEventListener('error', reject, {once:true});
-      return;
-    }
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.defer = true;
-    s.dataset.googleIdentity = '1';
-    s.onload = resolve;
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
-async function requestDriveOAuthToken() {
-  await loadGoogleIdentityScript();
-  const clientId = getGoogleClientId();
-  if (!clientId) {
-    throw new Error('Chưa có Google OAuth Client ID. Vào cấu hình và nhập Client ID để cho phép app đọc/ghi app-config.json trên Drive.');
-  }
-  return new Promise(function(resolve, reject) {
-    const client = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/drive',
-      callback: function(resp) {
-        if (resp && resp.access_token) {
-          googleAccessToken = resp.access_token;
-          resolve(resp.access_token);
-        } else {
-          reject(new Error('Google không cấp quyền Drive.'));
-        }
-      },
-      error_callback: function(err) {
-        reject(new Error('Google OAuth lỗi: ' + (err?.message || 'không xác định')));
-      }
-    });
-    client.requestAccessToken({prompt: ''});
-  });
-}
-
-async function driveFetch(url, options) {
-  const token = await requestDriveOAuthToken();
-  const headers = Object.assign({}, options?.headers || {}, {
-    Authorization: 'Bearer ' + token
-  });
-  return fetch(url, Object.assign({}, options || {}, {headers}));
-}
-
-async function findSharedConfigFile(folderId) {
-  const q = encodeURIComponent(
-    "'" + folderId + "' in parents and name = '" + SHARED_CONFIG_FILE_NAME + "' and trashed = false"
-  );
-  const r = await driveFetch(
-    'https://www.googleapis.com/drive/v3/files?q=' + q +
-    '&fields=files(id,name,modifiedTime,mimeType)&pageSize=10'
-  );
-  if (!r.ok) throw new Error('Không tìm được app-config.json (' + r.status + ')');
-  const data = await r.json();
-  return data.files?.[0] || null;
-}
-
-async function readSharedConfigFromDrive(folderLink) {
-  const folderId = extractDriveFolderId(folderLink);
-  if (!folderId) throw new Error('Link folder Drive không hợp lệ.');
-  const file = await findSharedConfigFile(folderId);
-  if (!file) throw new Error('Chưa có app-config.json trong folder này.');
-  sharedConfigFileId = file.id;
-  const r = await driveFetch(
-    'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(file.id) + '?alt=media'
-  );
-  if (!r.ok) throw new Error('Không đọc được app-config.json (' + r.status + ')');
-  const config = await r.json();
-  if (!Array.isArray(config.accounts)) throw new Error('app-config.json không đúng định dạng.');
-  return {config, file};
-}
-
-async function createSharedConfigFile(folderId, config) {
-  const metadata = {
-    name: SHARED_CONFIG_FILE_NAME,
-    parents: [folderId],
-    mimeType: 'application/json'
-  };
-  const boundary = '-------DriveTVBoundary' + Date.now();
-  const body =
-    '--' + boundary + '\r\n' +
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-    JSON.stringify(metadata) + '\r\n' +
-    '--' + boundary + '\r\n' +
-    'Content-Type: application/json\r\n\r\n' +
-    JSON.stringify(config, null, 2) + '\r\n' +
-    '--' + boundary + '--';
-
-  const r = await driveFetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-    {
-      method:'POST',
-      headers:{'Content-Type':'multipart/related; boundary=' + boundary},
-      body:body
-    }
-  );
-  if (!r.ok) throw new Error('Không tạo được app-config.json (' + r.status + ')');
-  return await r.json();
-}
-
-async function updateSharedConfigFile(fileId, config) {
-  const r = await driveFetch(
-    'https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(fileId) + '?uploadType=media',
-    {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(config, null, 2)
-    }
-  );
-  if (!r.ok) throw new Error('Không cập nhật được app-config.json (' + r.status + ')');
-  return await r.json();
-}
-
-async function saveAccountsToSharedDrive(folderLink) {
-  const folderId = extractDriveFolderId(folderLink);
-  if (!folderId) throw new Error('Link folder Drive dùng để lưu cấu hình không hợp lệ.');
-
-  const accounts = getAccounts();
-  if (!accounts.length) throw new Error('Chưa có account để lưu.');
-
-  const config = {
-    schemaVersion: 1,
-    updatedAt: new Date().toISOString(),
-    accounts: accounts
-  };
-
-  const existing = await findSharedConfigFile(folderId);
-  let result;
-  if (existing) {
-    sharedConfigFileId = existing.id;
-    result = await updateSharedConfigFile(existing.id, config);
-  } else {
-    result = await createSharedConfigFile(folderId, config);
-    sharedConfigFileId = result.id;
-  }
-
-  setSharedConfigFolder(folderLink);
-  return result;
-}
-
-async function loadAccountsFromSharedDrive(folderLink, silent) {
-  const result = await readSharedConfigFromDrive(folderLink);
-  const normalized = result.config.accounts.map(normalizeAccount).filter(function(a) {
-    return a.apiKey && a.folderLink;
-  });
-  if (!normalized.length) throw new Error('File cấu hình không có account hợp lệ.');
-
-  saveAccounts(normalized);
-  accountDraftRows = getAccounts().map(function(a) {
-    return {
-      googleAccount:a.googleAccount || '',
-      label:a.label || '',
-      apiKey:a.apiKey || '',
-      folderLink:a.folderLink || ''
-    };
-  });
-  setSharedConfigFolder(folderLink);
-  renderAccountRows();
-
-  if (!silent) {
-    sharedConfigStatus.textContent =
-      '✓ Đã đọc ' + normalized.length + ' account. Cập nhật lúc ' +
-      (result.file.modifiedTime ? new Date(result.file.modifiedTime).toLocaleString() : 'vừa xong') + '.';
-  }
-  return normalized;
-}
-
-async function initSharedConfigUI() {
-  const input = document.getElementById('sharedConfigFolderLink');
-  const status = document.getElementById('sharedConfigStatus');
-  const loadBtn = document.getElementById('sharedConfigLoadBtn');
-  const saveBtnShared = document.getElementById('sharedConfigSaveBtn');
-  if (!input || !status) return;
-  input.value = getSharedConfigFolder();
-
-  loadBtn?.addEventListener('click', async function() {
-    try {
-      status.textContent = '⏳ Đang đăng nhập Google và đọc app-config.json...';
-      await loadAccountsFromSharedDrive(input.value.trim());
-    } catch(e) {
-      status.textContent = '✗ ' + (e.message || String(e));
-    }
-  });
-
-  saveBtnShared?.addEventListener('click', async function() {
-    try {
-      status.textContent = '⏳ Đang đăng nhập Google và lưu cấu hình...';
-      await saveAccountsToSharedDrive(input.value.trim());
-      status.textContent = '✓ Đã lưu toàn bộ account vào app-config.json. Máy khác có thể đọc file này.';
-    } catch(e) {
-      status.textContent = '✗ ' + (e.message || String(e));
-    }
-  });
-}
-
-document.addEventListener('DOMContentLoaded', initSharedConfigUI);
 
 function normalizeAccount(a) {
   return {
@@ -566,12 +232,12 @@ function saveMetaStore(store) {
 // trí xem giữ nguyên bất kể đang phát từ tài khoản/nguồn nào.
 function getMeta(key) {
   const store = getMetaStore();
-  return store[key] || { title: null, favorite: false, hidden: false };
+  return Object.assign({ title: null, favorite: false, hidden: false, note: '', watchedManual: false }, store[key] || {});
 }
 
 function setMeta(key, patch) {
   const store = getMetaStore();
-  store[key] = Object.assign({ title: null, favorite: false, hidden: false }, store[key] || {}, patch);
+  store[key] = Object.assign({ title: null, favorite: false, hidden: false, note: '', watchedManual: false }, store[key] || {}, patch);
   saveMetaStore(store);
 }
 
@@ -588,7 +254,7 @@ function getProgress(key) {
 function setProgress(key, data) {
   const store = getProgressStore();
   if (data === null) { delete store[key]; }
-  else { store[key] = data; }
+  else { store[key] = Object.assign({}, data, { updatedAt: Date.now() }); }
   localStorage.setItem(LS_KEY_PROGRESS, JSON.stringify(store));
 }
 
@@ -629,7 +295,7 @@ function sendTokenToServiceWorker(token) {
 
 function updateSignInButton() {
   if (!signInBtn) return;
-  signInBtn.textContent = accessToken ? '✅ Đã đăng nhập' : '👤 Đăng nhập';
+  signInBtn.textContent = accessToken ? '✅' : '👤';
   signInBtn.title = accessToken
     ? 'Đã đăng nhập Google (tránh giới hạn tải xuống)'
     : 'Đăng nhập Google để tránh lỗi "download quota exceeded"';
@@ -974,10 +640,163 @@ function showScreen(name) {
   if (name === 'player') playerScreen.classList.remove('hidden');
 }
 
+// ---------------- Kiểu xem: lưới / danh sách ----------------
+
+function getSavedView() {
+  return localStorage.getItem(LS_KEY_VIEW) === 'list' ? 'list' : 'grid';
+}
+
+function applyView(view) {
+  videoGrid.classList.toggle('list-view', view === 'list');
+  if (viewToggleBtn) viewToggleBtn.textContent = view === 'list' ? '☰' : '▦';
+}
+
+if (viewToggleBtn) {
+  applyView(getSavedView());
+  viewToggleBtn.addEventListener('click', function () {
+    const next = videoGrid.classList.contains('list-view') ? 'grid' : 'list';
+    localStorage.setItem(LS_KEY_VIEW, next);
+    applyView(next);
+  });
+}
+
+// ---------------- Chọn nhiều video (thao tác hàng loạt) ----------------
+
+function updateBulkBar() {
+  if (!bulkBar) return;
+  bulkBar.classList.toggle('hidden', !bulkModeActive);
+  videoGrid.classList.toggle('select-mode', bulkModeActive);
+  bulkCount.textContent = selectedKeys.size + ' video đã chọn';
+}
+
+if (selectModeBtn) {
+  selectModeBtn.addEventListener('click', function () {
+    bulkModeActive = !bulkModeActive;
+    selectModeBtn.classList.toggle('active-toggle', bulkModeActive);
+    if (!bulkModeActive) selectedKeys.clear();
+    updateBulkBar();
+    applyFilters();
+  });
+}
+
+if (bulkCancelBtn) {
+  bulkCancelBtn.addEventListener('click', function () {
+    bulkModeActive = false;
+    selectedKeys.clear();
+    if (selectModeBtn) selectModeBtn.classList.remove('active-toggle');
+    updateBulkBar();
+    applyFilters();
+  });
+}
+
+if (bulkFavBtn) {
+  bulkFavBtn.addEventListener('click', function () {
+    if (selectedKeys.size === 0) { toast('Chưa chọn video nào.'); return; }
+    selectedKeys.forEach(function (key) { setMeta(key, { favorite: true }); });
+    toast('Đã thêm ' + selectedKeys.size + ' video vào Yêu thích.', 'ok');
+    selectedKeys.clear();
+    updateBulkBar();
+    applyFilters();
+  });
+}
+
+if (bulkHideBtn) {
+  bulkHideBtn.addEventListener('click', function () {
+    if (selectedKeys.size === 0) { toast('Chưa chọn video nào.'); return; }
+    selectedKeys.forEach(function (key) {
+      const meta = getMeta(key);
+      setMeta(key, { hidden: !meta.hidden });
+    });
+    toast('Đã ẩn/hiện ' + selectedKeys.size + ' video.', 'ok');
+    selectedKeys.clear();
+    updateBulkBar();
+    applyFilters();
+  });
+}
+
 // ---------------- Cấu hình nhiều tài khoản (dòng động trong modal) ----------------
 
 let accountDraftRows = []; // [{label, apiKey, folderLink}] đang chỉnh trong modal, chưa lưu
 
+// ---------------- Chuyển tab trong màn hình Cấu hình ----------------
+
+function switchSettingsTab(name) {
+  document.querySelectorAll('.settings-tab').forEach(function (btn) {
+    btn.classList.toggle('active', btn.dataset.settingsTab === name);
+  });
+  document.querySelectorAll('.settings-panel-content').forEach(function (panel) {
+    panel.classList.toggle('hidden', panel.dataset.settingsPanel !== name);
+  });
+  if (name === 'backup') renderBackupStats();
+}
+
+document.getElementById('settingsTabs')?.addEventListener('click', function (e) {
+  const btn = e.target.closest('.settings-tab');
+  if (!btn) return;
+  switchSettingsTab(btn.dataset.settingsTab);
+});
+
+// ---------------- Sao lưu & khôi phục cấu hình ----------------
+
+function renderBackupStats() {
+  const el = document.getElementById('backupStats');
+  if (!el) return;
+  const metaStore = getMetaStore();
+  const values = Object.values(metaStore);
+  const favCount = values.filter(function (m) { return m.favorite; }).length;
+  const hiddenCount = values.filter(function (m) { return m.hidden; }).length;
+  const noteCount = values.filter(function (m) { return m.note; }).length;
+  el.innerHTML =
+    '<div class="stat-box"><span class="stat-num">' + getAccounts().length + '</span><span class="stat-label">Tài khoản</span></div>' +
+    '<div class="stat-box"><span class="stat-num">' + allVideos.length + '</span><span class="stat-label">Video hiện có</span></div>' +
+    '<div class="stat-box"><span class="stat-num">' + favCount + '</span><span class="stat-label">Yêu thích</span></div>' +
+    '<div class="stat-box"><span class="stat-num">' + hiddenCount + '</span><span class="stat-label">Đã ẩn</span></div>' +
+    '<div class="stat-box"><span class="stat-num">' + noteCount + '</span><span class="stat-label">Có ghi chú</span></div>';
+}
+
+document.getElementById('exportConfigBtn')?.addEventListener('click', function () {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    accounts: getAccounts(),
+    meta: getMetaStore(),
+    progress: getProgressStore()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  a.href = url;
+  a.download = 'dethidrivetv-backup-' + stamp + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  toast('Đã xuất file sao lưu.', 'ok');
+});
+
+document.getElementById('importConfigInput')?.addEventListener('change', function (e) {
+  const file = e.target.files && e.target.files[0];
+  const backupMsg = document.getElementById('backupMsg');
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function () {
+    try {
+      const data = JSON.parse(String(reader.result));
+      if (!data || !Array.isArray(data.accounts)) throw new Error('File không đúng định dạng sao lưu.');
+      saveAccounts(data.accounts);
+      if (data.meta && typeof data.meta === 'object') saveMetaStore(data.meta);
+      if (data.progress && typeof data.progress === 'object') localStorage.setItem(LS_KEY_PROGRESS, JSON.stringify(data.progress));
+      if (backupMsg) backupMsg.textContent = '✓ Đã khôi phục cấu hình. Đang tải lại...';
+      toast('Khôi phục thành công. Đang tải lại trang...', 'ok');
+      setTimeout(function () { location.reload(); }, 900);
+    } catch (err) {
+      if (backupMsg) backupMsg.textContent = '';
+      toast('Lỗi đọc file sao lưu: ' + (err.message || String(err)), 'err');
+    }
+  };
+  reader.readAsText(file);
+});
 
 // ================= ACCOUNT SETUP WIZARD =================
 const accountWizard = document.getElementById('accountWizard');
@@ -1023,6 +842,8 @@ function openAccountWizard() {
   wizardFolderLink.value = '';
   wizardApiStatus.textContent = '';
   wizardFolderStatus.textContent = '';
+  const fcd = document.getElementById('wizardFolderCreatedDone'); if (fcd) fcd.checked = false;
+  const fsd = document.getElementById('wizardFolderSharedDone'); if (fsd) fsd.checked = false;
   wizardStep5Next.disabled = true;
   wizardShowStep(1);
   accountWizard.classList.remove('hidden');
@@ -1040,7 +861,7 @@ closeAccountWizardBtn?.addEventListener('click', closeAccountWizard);
 document.getElementById('wizardStep1Next')?.addEventListener('click', function() {
   const email = wizardGoogleAccount.value.trim();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    alert('Vui lòng nhập đúng Google Account/Gmail của tài khoản mới.');
+    toast('Vui lòng nhập đúng Google Account/Gmail của tài khoản mới.', 'err');
     return;
   }
   accountWizardData.googleAccount = email;
@@ -1057,7 +878,7 @@ document.getElementById('wizardProjectBtn')?.addEventListener('click', function(
 });
 document.getElementById('wizardStep2Next')?.addEventListener('click', function() {
   if (!document.getElementById('wizardProjectDone').checked) {
-    alert('Hãy xác nhận bạn đã chọn/tạo Project bằng Google Account mới.');
+    toast('Hãy xác nhận bạn đã chọn/tạo Project bằng Google Account mới.', 'err');
     return;
   }
   wizardShowStep(3);
@@ -1067,7 +888,7 @@ document.getElementById('wizardDriveApiBtn')?.addEventListener('click', function
 });
 document.getElementById('wizardStep3Next')?.addEventListener('click', function() {
   if (!document.getElementById('wizardDriveApiDone').checked) {
-    alert('Hãy xác nhận Google Drive API đã được bật.');
+    toast('Hãy xác nhận Google Drive API đã được bật.', 'err');
     return;
   }
   wizardShowStep(4);
@@ -1086,7 +907,19 @@ document.getElementById('wizardStep4Next')?.addEventListener('click', function()
   wizardShowStep(5);
 });
 
+document.getElementById('wizardOpenDriveBtn')?.addEventListener('click', function() {
+  window.open('https://drive.google.com/drive/my-drive', '_blank', 'noopener,noreferrer');
+});
+
 document.getElementById('wizardCheckFolderBtn')?.addEventListener('click', async function() {
+  if (!document.getElementById('wizardFolderCreatedDone').checked) {
+    wizardFolderStatus.textContent = '⚠ Hãy xác nhận bạn đã tạo folder mới trên Drive.';
+    return;
+  }
+  if (!document.getElementById('wizardFolderSharedDone').checked) {
+    wizardFolderStatus.textContent = '⚠ Hãy xác nhận bạn đã chia sẻ folder "Bất kỳ ai có đường liên kết" và chọn quyền phù hợp.';
+    return;
+  }
   const label = wizardAccountLabelInput.value.trim();
   const folder = wizardFolderLink.value.trim();
   if (!label) {
@@ -1101,10 +934,9 @@ document.getElementById('wizardCheckFolderBtn')?.addEventListener('click', async
   wizardStep5Next.disabled = true;
 
   try {
-    // Dùng đúng hàm quét folder hiện có trong app.
-    // Không lưu account cho tới khi kiểm tra thành công.
-    const result = await fetchFolderVideos(accountWizardData.apiKey, folder);
-    const count = Array.isArray(result) ? result.length : (result?.videos?.length || 0);
+    const folderId = extractFolderId(folder);
+    const files = await listFolderFiles(accountWizardData.apiKey, folderId);
+    const count = files.filter(isVideoFile).length;
     accountWizardData.label = label;
     accountWizardData.folderLink = folder;
     accountWizardData.folderOk = true;
@@ -1153,9 +985,9 @@ document.getElementById('wizardFinishBtn')?.addEventListener('click', function()
     renderAccountRows();
     showScreen('grid');
     loadVideos();
-    alert('✓ Đã lưu vĩnh viễn account ' + newAccount.googleAccount + ' trên trình duyệt này.');
+    toast('✓ Đã lưu vĩnh viễn account ' + newAccount.googleAccount + ' trên trình duyệt này.', 'ok');
   } catch (err) {
-    alert('✗ Không lưu được account: ' + (err.message || String(err)));
+    toast('✗ Không lưu được account: ' + (err.message || String(err)), 'err');
   }
 });
 
@@ -1280,6 +1112,7 @@ function openSettings() {
     : [{ label: '', apiKey: '', folderLink: '' }];
   renderAccountRows();
   settingsError.textContent = '';
+  switchSettingsTab('accounts');
   settingsScreen.classList.remove('hidden');
   const firstInput = accountsListEl.querySelector('input');
   if (firstInput) firstInput.focus();
@@ -1294,17 +1127,10 @@ closeSettingsBtn.addEventListener('click', function () {
   if (isConfigured()) closeSettings();
 });
 
-if (addAccountBtn) {
-  addAccountBtn.addEventListener('click', function () {
-    // Account mới phải có cấu hình riêng. KHÔNG tự lấy API Key của account cũ.
-    accountDraftRows.push({ googleAccount: '', label: '', apiKey: '', folderLink: '' });
-    renderAccountRows();
-    const rows = accountsListEl.querySelectorAll('.account-row');
-    const lastRowEl = rows[rows.length - 1];
-    const inputs = lastRowEl ? lastRowEl.querySelectorAll('input') : [];
-    // Focus vào ô "Tên gợi nhớ" (ô đầu tiên) của dòng mới, vì API Key
-    // đã tự điền sẵn rồi - chỉ cần gõ tên + dán link folder.
-    if (inputs[0]) inputs[0].focus();
+if (shortcutsBtn) {
+  shortcutsBtn.addEventListener('click', function () {
+    openSettings();
+    switchSettingsTab('shortcuts');
   });
 }
 
@@ -1335,6 +1161,7 @@ saveBtn.addEventListener('click', function () {
     closeSettings();
     showScreen('grid');
     loadVideos();
+    toast('Đã lưu cấu hình.', 'ok');
   } catch (err) {
     settingsError.textContent = err.message || String(err);
   }
@@ -1351,17 +1178,32 @@ tabsEl.addEventListener('click', function (e) {
 });
 
 sortSelect.addEventListener('change', applyFilters);
-searchInput.addEventListener('input', applyFilters);
+searchInput.addEventListener('input', function () {
+  clearSearchBtn.classList.toggle('hidden', !searchInput.value);
+  applyFilters();
+});
+if (clearSearchBtn) {
+  clearSearchBtn.addEventListener('click', function () {
+    searchInput.value = '';
+    clearSearchBtn.classList.add('hidden');
+    searchInput.focus();
+    applyFilters();
+  });
+}
 refreshBtn.addEventListener('click', function () { loadVideos(); });
 
 function decorate(video) {
   const meta = getMeta(video.key);
   const progress = getProgress(video.key);
+  const rawPct = progress && progress.duration ? Math.min(100, Math.round((progress.time / progress.duration) * 100)) : 0;
   return Object.assign({}, video, {
     title: meta.title || video.originalTitle,
     favorite: !!meta.favorite,
     hidden: !!meta.hidden,
-    watchedPct: progress && progress.duration ? Math.min(100, Math.round((progress.time / progress.duration) * 100)) : 0
+    note: meta.note || '',
+    watchedManual: !!meta.watchedManual,
+    watchedPct: meta.watchedManual ? 100 : rawPct,
+    progressUpdatedAt: progress ? (progress.updatedAt || 0) : 0
   });
 }
 
@@ -1388,9 +1230,20 @@ function applyFilters() {
       if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
       return a.title.localeCompare(b.title, 'vi');
     });
+  } else if (sortMode === 'progress') {
+    list.sort(function (a, b) {
+      if (a.watchedPct !== b.watchedPct) return b.watchedPct - a.watchedPct;
+      return a.title.localeCompare(b.title, 'vi');
+    });
   }
 
   renderVideos(list);
+  renderContinueWatching(term);
+
+  if (videoCountBadge) {
+    videoCountBadge.classList.toggle('hidden', allVideos.length === 0);
+    videoCountBadge.textContent = allVideos.length + ' video';
+  }
 
   if (allVideos.length === 0) {
     statusMsg.textContent = 'Không thấy video nào trong folder. Kiểm tra lại link folder và quyền chia sẻ.';
@@ -1399,10 +1252,77 @@ function applyFilters() {
   }
 }
 
+// ---------------- "Xem tiếp" (continue watching) ----------------
+
+function renderContinueWatching(term) {
+  if (!continueSection || !continueRow) return;
+  if (term || currentTab !== 'all' || bulkModeActive) {
+    continueSection.classList.add('hidden');
+    return;
+  }
+  const list = allVideos.map(decorate)
+    .filter(function (v) { return !v.hidden && v.watchedPct > 3 && v.watchedPct < 95 && !v.watchedManual; })
+    .sort(function (a, b) { return b.progressUpdatedAt - a.progressUpdatedAt; })
+    .slice(0, 12);
+
+  if (list.length === 0) {
+    continueSection.classList.add('hidden');
+    continueRow.innerHTML = '';
+    return;
+  }
+
+  continueSection.classList.remove('hidden');
+  continueRow.innerHTML = '';
+  list.forEach(function (video) {
+    const card = document.createElement('div');
+    card.className = 'continue-card';
+    card.tabIndex = 0;
+
+    const thumbWrap = document.createElement('div');
+    thumbWrap.className = 'thumb-wrap';
+    const img = document.createElement('img');
+    img.className = 'thumb';
+    img.alt = video.title;
+    if (video.thumbnail) { img.src = video.thumbnail; }
+    else { img.style.background = '#37474f'; }
+    thumbWrap.appendChild(img);
+
+    const sliver = document.createElement('div');
+    sliver.className = 'progress-sliver';
+    sliver.style.width = video.watchedPct + '%';
+    thumbWrap.appendChild(sliver);
+
+    const info = document.createElement('div');
+    info.className = 'info';
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = video.title;
+    const desc = document.createElement('div');
+    desc.className = 'desc';
+    desc.textContent = 'Đã xem ' + video.watchedPct + '%';
+    info.appendChild(title);
+    info.appendChild(desc);
+
+    card.appendChild(thumbWrap);
+    card.appendChild(info);
+    card.addEventListener('click', function () { openPlayer(video); });
+    card.addEventListener('keydown', function (e) { if (e.key === 'Enter') openPlayer(video); });
+    continueRow.appendChild(card);
+  });
+}
+
 // ---------------- Grid rendering ----------------
 
 function renderVideos(videos) {
   videoGrid.innerHTML = '';
+
+  if (videos.length === 0 && allVideos.length > 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = '<span class="empty-emoji">🔍</span>Không tìm thấy video phù hợp.';
+    videoGrid.appendChild(empty);
+    return;
+  }
 
   videos.forEach(function (video) {
     const card = document.createElement('div');
@@ -1413,6 +1333,13 @@ function renderVideos(videos) {
 
     const thumbWrap = document.createElement('div');
     thumbWrap.className = 'thumb-wrap';
+
+    if (bulkModeActive) {
+      const check = document.createElement('div');
+      check.className = 'select-check' + (selectedKeys.has(video.key) ? ' checked' : '');
+      check.textContent = selectedKeys.has(video.key) ? '✓' : '';
+      thumbWrap.appendChild(check);
+    }
 
     const img = document.createElement('img');
     img.className = 'thumb';
@@ -1431,6 +1358,13 @@ function renderVideos(videos) {
       ccBadge.textContent = 'CC';
       thumbWrap.appendChild(ccBadge);
     }
+    if (video.note) {
+      const noteBadge = document.createElement('span');
+      noteBadge.className = 'badge badge-note';
+      noteBadge.textContent = '📝';
+      noteBadge.title = video.note;
+      thumbWrap.appendChild(noteBadge);
+    }
     if (video.sources.length > 1) {
       const multiBadge = document.createElement('span');
       multiBadge.className = 'badge badge-multi';
@@ -1445,7 +1379,13 @@ function renderVideos(videos) {
       favBadge.textContent = '★';
       thumbWrap.appendChild(favBadge);
     }
-    if (video.watchedPct > 3) {
+    if (video.watchedManual || video.watchedPct >= 95) {
+      const watchedBadge = document.createElement('span');
+      watchedBadge.className = 'badge badge-watched';
+      watchedBadge.textContent = '✓ Đã xem';
+      thumbWrap.appendChild(watchedBadge);
+    }
+    if (video.watchedPct > 3 && video.watchedPct < 95) {
       const sliver = document.createElement('div');
       sliver.className = 'progress-sliver';
       sliver.style.width = video.watchedPct + '%';
@@ -1461,11 +1401,18 @@ function renderVideos(videos) {
 
     const desc = document.createElement('div');
     desc.className = 'desc';
-    desc.textContent = video.watchedPct >= 95 ? 'Đã xem xong' :
+    desc.textContent = (video.watchedManual || video.watchedPct >= 95) ? 'Đã xem xong' :
       (video.watchedPct > 3 ? 'Đã xem ' + video.watchedPct + '%' : 'Nhấn để phát');
 
     info.appendChild(title);
     info.appendChild(desc);
+
+    if (video.note) {
+      const notePreview = document.createElement('div');
+      notePreview.className = 'note-preview';
+      notePreview.textContent = '📝 ' + video.note;
+      info.appendChild(notePreview);
+    }
 
     const tools = document.createElement('div');
     tools.className = 'card-tools';
@@ -1480,7 +1427,7 @@ function renderVideos(videos) {
     });
 
     const editBtn = document.createElement('button');
-    editBtn.textContent = '✎ Sửa tên';
+    editBtn.textContent = '✎ Sửa';
     editBtn.addEventListener('click', function (e) {
       e.stopPropagation();
       openEditModal(video);
@@ -1502,9 +1449,18 @@ function renderVideos(videos) {
     card.appendChild(info);
     card.appendChild(tools);
 
-    card.addEventListener('click', function () { openPlayer(video); });
+    card.addEventListener('click', function () {
+      if (bulkModeActive) {
+        if (selectedKeys.has(video.key)) selectedKeys.delete(video.key);
+        else selectedKeys.add(video.key);
+        updateBulkBar();
+        applyFilters();
+        return;
+      }
+      openPlayer(video);
+    });
     card.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); openPlayer(video); }
+      if (e.key === 'Enter') { e.preventDefault(); card.click(); }
     });
 
     videoGrid.appendChild(card);
@@ -1519,6 +1475,7 @@ async function loadVideos() {
   try {
     allVideos = await fetchFolderVideos(accounts);
     searchInput.value = '';
+    if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
     applyFilters();
     const partialErrors = allVideos._partialErrors || [];
     if (partialErrors.length > 0) {
@@ -1538,6 +1495,8 @@ async function loadVideos() {
 function openEditModal(video) {
   editingKey = video.key;
   editTitleInput.value = video.title;
+  if (editNoteInput) editNoteInput.value = video.note || '';
+  if (editWatchedInput) editWatchedInput.checked = !!video.watchedManual;
   editModal.classList.remove('hidden');
   editTitleInput.focus();
 }
@@ -1550,7 +1509,10 @@ function closeEditModal() {
 editSaveBtn.addEventListener('click', function () {
   if (!editingKey) return;
   const val = editTitleInput.value.trim();
-  setMeta(editingKey, { title: val || null });
+  const patch = { title: val || null };
+  if (editNoteInput) patch.note = editNoteInput.value.trim();
+  if (editWatchedInput) patch.watchedManual = editWatchedInput.checked;
+  setMeta(editingKey, patch);
   closeEditModal();
   applyFilters();
 });
@@ -1688,6 +1650,7 @@ async function openPlayer(rawVideo) {
   playerTitle.textContent = video.title;
   videoPlayer.playbackRate = SPEEDS[speedIndex];
   speedBtn.textContent = SPEEDS[speedIndex] + 'x';
+  if (pipBtn) pipBtn.classList.toggle('hidden', !document.pictureInPictureEnabled);
   showScreen('player');
   showControls();
 
@@ -1825,6 +1788,19 @@ speedBtn.addEventListener('click', function () {
   showControls();
 });
 
+if (pipBtn) {
+  pipBtn.addEventListener('click', async function () {
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (document.pictureInPictureEnabled) {
+        await videoPlayer.requestPictureInPicture();
+      }
+    } catch (e) { /* trình duyệt không hỗ trợ PiP cho video này */ }
+    showControls();
+  });
+}
+
 function isFullscreen() {
   return !!document.fullscreenElement;
 }
@@ -1922,6 +1898,7 @@ document.addEventListener('keydown', function (e) {
     if (key === 'f' || key === 'F') { e.preventDefault(); fullscreenBtn.click(); return; }
     if (key === 'm' || key === 'M') { e.preventDefault(); muteBtn.click(); return; }
     if (key === 'c' || key === 'C') { e.preventDefault(); if (!subtitleBtn.classList.contains('hidden')) subtitleBtn.click(); return; }
+    if (key === '?') { e.preventDefault(); shortcutsBtn?.click(); return; }
     if (key === 'Escape' || key === 'Backspace') { e.preventDefault(); closePlayer(); return; }
     if (key === 'Enter') {
       if (active && active.tagName === 'BUTTON') { e.preventDefault(); active.click(); }
@@ -1943,6 +1920,13 @@ document.addEventListener('keydown', function (e) {
       e.preventDefault();
       active.click();
     }
+    return;
+  }
+
+  if (key === '?' && !isTextInput(active)) {
+    e.preventDefault();
+    openSettings();
+    switchSettingsTab('shortcuts');
     return;
   }
 

@@ -12,30 +12,57 @@
   <!-- ==================== MÀN HÌNH DANH SÁCH ==================== -->
   <div id="gridScreen" class="screen hidden">
     <header class="topbar">
-      <h1 class="page-title">📺 Dethi Drive TV</h1>
-      <button id="signInBtn" class="icon-btn" tabindex="0" title="Đăng nhập Google">👤 Đăng nhập</button>
-      <button id="settingsBtn" class="icon-btn" tabindex="0" title="Cấu hình (phím M)">⚙️</button>
+      <div class="topbar-left">
+        <h1 class="page-title">📺 Dethi Drive TV</h1>
+        <span id="videoCountBadge" class="count-badge hidden"></span>
+      </div>
+      <div class="topbar-right">
+        <button id="viewToggleBtn" class="icon-btn" tabindex="0" title="Đổi kiểu xem (lưới/danh sách)">▦</button>
+        <button id="selectModeBtn" class="icon-btn" tabindex="0" title="Chọn nhiều video">☑</button>
+        <button id="signInBtn" class="icon-btn" tabindex="0" title="Đăng nhập Google">👤</button>
+        <button id="settingsBtn" class="icon-btn" tabindex="0" title="Cấu hình (phím M)">⚙️</button>
+      </div>
     </header>
 
     <div class="toolbar">
       <div class="search-row">
-        <input id="searchInput" type="text" tabindex="0" placeholder="🔍 Tìm video theo tên..." />
+        <span class="search-icon" aria-hidden="true">🔍</span>
+        <input id="searchInput" type="text" tabindex="0" placeholder="Tìm video theo tên..." />
+        <button id="clearSearchBtn" class="clear-search-btn hidden" type="button" title="Xoá tìm kiếm">✕</button>
       </div>
       <select id="sortSelect" tabindex="0">
         <option value="name">Tên A → Z</option>
         <option value="newest">Mới thêm gần đây</option>
         <option value="favorite">Yêu thích trước</option>
+        <option value="progress">Đang xem dở trước</option>
       </select>
-      <button id="refreshBtn" class="btn" tabindex="0">↻ Tải lại</button>
+      <button id="refreshBtn" class="btn" tabindex="0" title="Tải lại danh sách (F5)">↻ Tải lại</button>
     </div>
 
-    <div class="tabs" id="tabs">
-      <button class="tab active" data-tab="all" tabindex="0">Tất cả</button>
-      <button class="tab" data-tab="favorite" tabindex="0">★ Yêu thích</button>
-      <button class="tab" data-tab="hidden" tabindex="0">🙈 Đã ẩn</button>
+    <div class="tabs-row">
+      <div class="tabs" id="tabs">
+        <button class="tab active" data-tab="all" tabindex="0">Tất cả</button>
+        <button class="tab" data-tab="favorite" tabindex="0">★ Yêu thích</button>
+        <button class="tab" data-tab="hidden" tabindex="0">🙈 Đã ẩn</button>
+      </div>
+    </div>
+
+    <div id="bulkBar" class="bulk-bar hidden">
+      <span id="bulkCount" class="bulk-count">0 video đã chọn</span>
+      <div class="bulk-actions">
+        <button id="bulkFavBtn" class="btn btn-sm" type="button">★ Yêu thích</button>
+        <button id="bulkHideBtn" class="btn btn-sm" type="button">🙈 Ẩn/Hiện</button>
+        <button id="bulkCancelBtn" class="btn btn-sm" type="button">Huỷ chọn</button>
+      </div>
     </div>
 
     <p id="statusMsg" class="status"></p>
+
+    <section id="continueSection" class="continue-section hidden">
+      <h2 class="section-title">▶ Xem tiếp</h2>
+      <div id="continueRow" class="continue-row"></div>
+    </section>
+
     <div id="videoGrid" class="grid"></div>
   </div>
 
@@ -54,6 +81,7 @@
         <div class="pc-top">
           <button id="backBtn" class="icon-btn" tabindex="0" title="Quay lại (Esc)">←</button>
           <span id="playerTitle" class="player-title"></span>
+          <button id="shortcutsBtn" class="icon-btn pc-shortcuts-btn" tabindex="0" title="Phím tắt (?)">?</button>
         </div>
 
         <div class="pc-seek-row">
@@ -73,6 +101,7 @@
           <div class="pc-right">
             <button id="subtitleBtn" class="icon-btn hidden" tabindex="0" title="Bật/Tắt phụ đề (C)">CC</button>
             <button id="speedBtn" class="icon-btn" tabindex="0" title="Tốc độ phát">1x</button>
+            <button id="pipBtn" class="icon-btn" tabindex="0" title="Thu nhỏ nổi (PiP)">⧉</button>
             <button id="fullscreenBtn" class="icon-btn" tabindex="0" title="Toàn màn hình (F)">⛶</button>
           </div>
         </div>
@@ -82,256 +111,214 @@
 
   <!-- ==================== MODAL CẤU HÌNH ==================== -->
   <div id="settingsScreen" class="modal-overlay hidden">
-    <div class="settings-box">
-      <h1>Cấu hình tài khoản Google Drive</h1>
-
-      <p class="hint">
-        Có thể thêm nhiều tài khoản (mỗi tài khoản = 1 folder Drive).
-        Phim trùng tên ở nhiều tài khoản sẽ tự gộp làm 1 - khi 1 tài
-        khoản bị giới hạn (quota), app tự nhảy sang tài khoản khác
-        phát tiếp, không cần chọn lại.
-      </p>
-
-      <div id="accountsList" class="accounts-list"></div>
-
-      <button id="addAccountBtn" class="btn" type="button" tabindex="0">+ Thêm tài khoản</button>
-      <div id="accountWizard" class="account-wizard hidden">
-        <div class="wizard-head">
-          <div>
-            <strong>➕ Thêm Google Account mới</strong>
-            <div class="wizard-sub">Quy trình này tạo cấu hình riêng cho chính Google Account mới. API Key sẽ lấy từ Google Cloud Project của account đó, không dùng Key của account khác.</div>
-          </div>
-          <button id="closeAccountWizardBtn" class="btn" type="button">Đóng</button>
-        </div>
-
-        <div class="wizard-progress">
-          <span data-wstep="1">1. Account</span>
-          <span data-wstep="2">2. Project</span>
-          <span data-wstep="3">3. Drive API</span>
-          <span data-wstep="4">4. API Key</span>
-          <span data-wstep="5">5. Folder</span>
-          <span data-wstep="6">6. Hoàn tất</span>
-        </div>
-
-        <div class="wizard-panel" data-panel="1">
-          <div class="wizard-number">1</div>
-          <h3>Nhập Google Account mới</h3>
-          <p>Nhập Gmail/Google Account mà bạn muốn dùng cho nguồn phim mới.</p>
-          <input id="wizardGoogleAccount" type="email" placeholder="ví dụ: minhvukgh1977@gmail.com" autocomplete="email">
-          <button id="wizardStep1Next" class="btn btn-primary" type="button">Tiếp tục →</button>
-          <div class="wizard-note">⚠ Đây là account sẽ được dùng để tạo/chọn Google Cloud Project và API Key ở các bước sau.</div>
-        </div>
-
-        <div class="wizard-panel hidden" data-panel="2">
-          <div class="wizard-number">2</div>
-          <h3>Mở Google Cloud bằng account mới</h3>
-          <p>Hãy chắc chắn trình duyệt đang đăng nhập đúng: <b id="wizardAccountLabel"></b>.</p>
-          <button id="wizardCloudBtn" class="btn api-link-btn" type="button">↗ Mở Google Cloud</button>
-          <button id="wizardProjectBtn" class="btn api-link-btn" type="button">↗ Tạo Project mới</button>
-          <label class="wizard-check"><input id="wizardProjectDone" type="checkbox"> Tôi đã chọn/tạo Project bằng account mới</label>
-          <button id="wizardStep2Next" class="btn btn-primary" type="button">Tiếp tục →</button>
-        </div>
-
-        <div class="wizard-panel hidden" data-panel="3">
-          <div class="wizard-number">3</div>
-          <h3>Bật Google Drive API</h3>
-          <p>Trong Project vừa tạo/chọn, mở Google Drive API và bấm <b>Enable</b> nếu Google yêu cầu.</p>
-          <button id="wizardDriveApiBtn" class="btn api-link-btn" type="button">↗ Mở Google Drive API</button>
-          <label class="wizard-check"><input id="wizardDriveApiDone" type="checkbox"> Tôi đã bật Google Drive API cho Project này</label>
-          <button id="wizardStep3Next" class="btn btn-primary" type="button">Tiếp tục →</button>
-        </div>
-
-        <div class="wizard-panel hidden" data-panel="4">
-          <div class="wizard-number">4</div>
-          <h3>Tạo API Key cho Project của account mới</h3>
-          <p>Mở Credentials → Create credentials → API key. Sau khi Google hiện Key, copy Key đó.</p>
-          <button id="wizardCredentialsBtn" class="btn api-link-btn" type="button">↗ Mở Credentials</button>
-          <input id="wizardApiKey" type="text" placeholder="Dán API Key mới, ví dụ AIza..." autocomplete="off" spellcheck="false">
-          <button id="wizardStep4Next" class="btn btn-primary" type="button">Kiểm tra Key →</button>
-          <div id="wizardApiStatus" class="wizard-status"></div>
-          <div class="wizard-note">🔐 App không thể tự tạo API Key trong Google Cloud thay bạn. Bạn chỉ cần thực hiện thao tác Create credentials và dán Key vào đây.</div>
-        </div>
-
-        <div class="wizard-panel hidden" data-panel="5">
-          <div class="wizard-number">5</div>
-          <h3>Gắn Folder Drive của account mới</h3>
-          <p>Folder nên nằm trên Drive của <b id="wizardFolderAccountLabel"></b> và chia sẻ <b>Bất kỳ ai có đường liên kết → Người xem</b>.</p>
-          <input id="wizardAccountLabelInput" type="text" placeholder="Tên hiển thị, ví dụ Account 1977">
-          <input id="wizardFolderLink" type="url" placeholder="https://drive.google.com/drive/folders/...">
-          <button id="wizardCheckFolderBtn" class="btn api-link-btn" type="button">🔍 Kiểm tra folder</button>
-          <div id="wizardFolderStatus" class="wizard-status"></div>
-          <button id="wizardStep5Next" class="btn btn-primary" type="button" disabled>Tiếp tục →</button>
-        </div>
-
-        <div class="wizard-panel hidden" data-panel="6">
-          <div class="wizard-number">✓</div>
-          <h3>Hoàn tất account mới</h3>
-          <div id="wizardSummary" class="wizard-summary"></div>
-          <button id="wizardFinishBtn" class="btn btn-primary" type="button">✓ Thêm account này vào app</button>
-        </div>
+    <div class="settings-panel">
+      <div class="settings-header">
+        <h1>⚙️ Cấu hình</h1>
+        <button id="closeSettingsBtn" class="icon-btn-plain" type="button" tabindex="0" title="Đóng">✕</button>
       </div>
 
+      <div class="settings-tabs" id="settingsTabs">
+        <button class="settings-tab active" type="button" data-settings-tab="accounts" tabindex="0">📁 Tài khoản Drive</button>
+        <button class="settings-tab" type="button" data-settings-tab="backup" tabindex="0">💾 Sao lưu</button>
+        <button class="settings-tab" type="button" data-settings-tab="shortcuts" tabindex="0">⌨️ Phím tắt</button>
+      </div>
 
+      <div class="settings-body">
 
+        <div class="settings-panel-content" data-settings-panel="accounts">
+          <p class="hint">
+            Có thể thêm nhiều tài khoản (mỗi tài khoản = 1 folder Drive).
+            Phim trùng tên ở nhiều tài khoản sẽ tự gộp làm 1 — khi 1 tài
+            khoản bị giới hạn (quota), app tự nhảy sang tài khoản khác
+            phát tiếp, không cần chọn lại.
+          </p>
 
-      <div class="oauth-wizard-box">
-        <div class="oauth-wizard-head">
-          <div>
-            <strong>🔐 Cấu hình Google OAuth Client ID</strong>
-            <div class="oauth-wizard-sub">
-              Quy trình này giúp app được Google cho phép <b>đọc và ghi file app-config.json</b>
-              trên Drive. Làm từng bước ngay trong app; bước nào cần thao tác trên Google
-              Cloud thì app có nút mở đúng trang.
+          <div id="accountsList" class="accounts-list"></div>
+
+          <button id="addAccountBtn" class="btn btn-primary btn-block" type="button" tabindex="0">➕ Thêm tài khoản mới</button>
+
+          <div id="accountWizard" class="account-wizard hidden">
+            <div class="wizard-head">
+              <div>
+                <strong>➕ Thêm Google Account mới</strong>
+                <div class="wizard-sub">Quy trình này tạo cấu hình riêng cho chính Google Account mới. API Key sẽ lấy từ Google Cloud Project của account đó, không dùng Key của account khác.</div>
+              </div>
+              <button id="closeAccountWizardBtn" class="btn btn-sm" type="button">Đóng</button>
+            </div>
+
+            <div class="wizard-progress">
+              <span data-wstep="1">1. Account</span>
+              <span data-wstep="2">2. Project</span>
+              <span data-wstep="3">3. Drive API</span>
+              <span data-wstep="4">4. API Key</span>
+              <span data-wstep="5">5. Folder</span>
+              <span data-wstep="6">6. Hoàn tất</span>
+            </div>
+
+            <div class="wizard-panel" data-panel="1">
+              <div class="wizard-number">1</div>
+              <h3>Nhập Google Account mới</h3>
+              <p>Nhập Gmail/Google Account mà bạn muốn dùng cho nguồn phim mới.</p>
+              <input id="wizardGoogleAccount" type="email" placeholder="ví dụ: minhvukgh1977@gmail.com" autocomplete="email">
+              <button id="wizardStep1Next" class="btn btn-primary" type="button">Tiếp tục →</button>
+              <div class="wizard-note">⚠ Đây là account sẽ được dùng để tạo/chọn Google Cloud Project và API Key ở các bước sau.</div>
+            </div>
+
+            <div class="wizard-panel hidden" data-panel="2">
+              <div class="wizard-number">2</div>
+              <h3>Mở Google Cloud bằng account mới</h3>
+              <p>Hãy chắc chắn trình duyệt đang đăng nhập đúng: <b id="wizardAccountLabel"></b>.</p>
+              <button id="wizardCloudBtn" class="btn api-link-btn" type="button">↗ Mở Google Cloud</button>
+              <button id="wizardProjectBtn" class="btn api-link-btn" type="button">↗ Tạo Project mới</button>
+              <label class="wizard-check"><input id="wizardProjectDone" type="checkbox"> Tôi đã chọn/tạo Project bằng account mới</label>
+              <button id="wizardStep2Next" class="btn btn-primary" type="button">Tiếp tục →</button>
+            </div>
+
+            <div class="wizard-panel hidden" data-panel="3">
+              <div class="wizard-number">3</div>
+              <h3>Bật Google Drive API</h3>
+              <p>Trong Project vừa tạo/chọn, mở Google Drive API và bấm <b>Enable</b> nếu Google yêu cầu.</p>
+              <button id="wizardDriveApiBtn" class="btn api-link-btn" type="button">↗ Mở Google Drive API</button>
+              <label class="wizard-check"><input id="wizardDriveApiDone" type="checkbox"> Tôi đã bật Google Drive API cho Project này</label>
+              <button id="wizardStep3Next" class="btn btn-primary" type="button">Tiếp tục →</button>
+            </div>
+
+            <div class="wizard-panel hidden" data-panel="4">
+              <div class="wizard-number">4</div>
+              <h3>Tạo API Key cho Project của account mới</h3>
+              <p>Mở Credentials → Create credentials → API key. Sau khi Google hiện Key, copy Key đó.</p>
+              <button id="wizardCredentialsBtn" class="btn api-link-btn" type="button">↗ Mở Credentials</button>
+              <input id="wizardApiKey" type="text" placeholder="Dán API Key mới, ví dụ AIza..." autocomplete="off" spellcheck="false">
+              <button id="wizardStep4Next" class="btn btn-primary" type="button">Kiểm tra Key →</button>
+              <div id="wizardApiStatus" class="wizard-status"></div>
+              <div class="wizard-note">🔐 App không thể tự tạo API Key trong Google Cloud thay bạn. Bạn chỉ cần thực hiện thao tác Create credentials và dán Key vào đây.</div>
+            </div>
+
+            <div class="wizard-panel hidden" data-panel="5">
+              <div class="wizard-number">5</div>
+              <h3>Tạo & chia sẻ Folder Drive cho account mới</h3>
+              <p>Tạo 1 folder Drive mới ngay trên Drive của <b id="wizardFolderAccountLabel"></b> để chứa video của account này.</p>
+              <button id="wizardOpenDriveBtn" class="btn api-link-btn" type="button">↗ Mở Google Drive</button>
+              <div class="wizard-mini-help">
+                Trong Drive: bấm <b>+ Mới</b> → <b>Thư mục mới</b> → đặt tên tuỳ ý
+                (ví dụ "Phim - Account 2") → <b>Tạo</b>.
+              </div>
+              <label class="wizard-check"><input id="wizardFolderCreatedDone" type="checkbox"> Tôi đã tạo xong folder mới</label>
+
+              <div class="wizard-mini-help">
+                Chuột phải vào folder vừa tạo → <b>Chia sẻ</b> → đổi thành
+                <b>"Bất kỳ ai có đường liên kết"</b>, rồi chọn quyền phù hợp:
+                <ul>
+                  <li><b>Người xem</b>: chỉ xem/phát video qua app. An toàn hơn -
+                      không ai (kể cả bạn từ máy khác) thêm/xoá được file trực
+                      tiếp trên Drive nếu không đăng nhập đúng account này.</li>
+                  <li><b>Người chỉnh sửa</b>: cho phép thêm/xoá video trực tiếp
+                      trên Drive (web, app điện thoại...) từ bất kỳ máy nào có
+                      link, không cần mở app này để upload.</li>
+                </ul>
+                Chọn <b>Người chỉnh sửa</b> nếu muốn tiện thêm video từ nhiều máy;
+                chọn <b>Người xem</b> nếu chỉ cần xem, muốn an toàn hơn.
+              </div>
+              <label class="wizard-check"><input id="wizardFolderSharedDone" type="checkbox"> Tôi đã chia sẻ "Bất kỳ ai có đường liên kết" và chọn quyền phù hợp</label>
+
+              <label for="wizardFolderLink">Copy link folder vừa chia sẻ, dán vào đây:</label>
+              <input id="wizardAccountLabelInput" type="text" placeholder="Tên hiển thị, ví dụ Account 1977">
+              <input id="wizardFolderLink" type="url" placeholder="https://drive.google.com/drive/folders/...">
+              <button id="wizardCheckFolderBtn" class="btn api-link-btn" type="button">🔍 Kiểm tra folder</button>
+              <div id="wizardFolderStatus" class="wizard-status"></div>
+              <button id="wizardStep5Next" class="btn btn-primary" type="button" disabled>Tiếp tục →</button>
+            </div>
+
+            <div class="wizard-panel hidden" data-panel="6">
+              <div class="wizard-number">✓</div>
+              <h3>Hoàn tất account mới</h3>
+              <div id="wizardSummary" class="wizard-summary"></div>
+              <button id="wizardFinishBtn" class="btn btn-primary" type="button">✓ Thêm account này vào app</button>
+              <div class="wizard-note">✓ Account này sẽ được lưu ngay trên máy này, dùng được luôn.</div>
             </div>
           </div>
-          <button id="closeOAuthWizardBtn" class="btn" type="button">Đóng</button>
+
+          <p class="hint">
+            Mỗi folder phải để chia sẻ "Bất kỳ ai có đường liên kết - Người
+            xem". Muốn tính năng dự phòng hoạt động, các tài khoản nên chứa
+            video CÙNG TÊN file (không cần y hệt 100%, chỉ cần trùng phần
+            tên trước đuôi mở rộng). Nếu có file phụ đề (.srt) cùng tên với
+            video, phụ đề sẽ tự động gắn vào khi phát. Bấm phím <b>M</b> bất
+            cứ lúc nào để mở lại màn hình này.
+          </p>
         </div>
 
-        <div class="oauth-progress">
-          <span data-owstep="1">1. Account</span>
-          <span data-owstep="2">2. Project</span>
-          <span data-owstep="3">3. Drive API</span>
-          <span data-owstep="4">4. Consent</span>
-          <span data-owstep="5">5. Client ID</span>
-          <span data-owstep="6">6. Origin</span>
-          <span data-owstep="7">7. Nhập vào app</span>
-          <span data-owstep="8">8. Kiểm tra</span>
-        </div>
+        <div class="settings-panel-content hidden" data-settings-panel="backup">
+          <p class="hint">
+            Toàn bộ cấu hình (tài khoản, yêu thích, tên hiển thị, video đã
+            ẩn, ghi chú, vị trí xem dở) chỉ được lưu <b>trên trình duyệt
+            này</b>. Xuất file sao lưu để chuyển sang máy khác, hoặc phòng
+            khi xoá lịch sử trình duyệt.
+          </p>
 
-        <div class="oauth-wizard-panel" data-owpanel="1">
-          <div class="oauth-step-number">1</div>
-          <h3>Nhập Google Account</h3>
-          <p>Nhập đúng Google Account sẽ dùng để quản lý Google Cloud Project và cấp quyền Drive cho app.</p>
-          <input id="oauthWizardAccount" type="email" placeholder="ví dụ: minhvukgh1977@gmail.com" autocomplete="email">
-          <button id="oauthWizardNext1" class="btn btn-primary" type="button">Tiếp tục →</button>
-          <div class="oauth-note">⚠ Hãy dùng đúng account này ở các bước Google Cloud tiếp theo.</div>
-        </div>
+          <div id="backupStats" class="backup-stats"></div>
 
-        <div class="oauth-wizard-panel hidden" data-owpanel="2">
-          <div class="oauth-step-number">2</div>
-          <h3>Chọn hoặc tạo Google Cloud Project</h3>
-          <p>Đăng nhập Google Cloud bằng <b id="oauthWizardAccountLabel"></b>, sau đó chọn Project hiện có hoặc tạo Project mới.</p>
-          <button id="oauthOpenCloudBtn" class="btn api-link-btn" type="button">↗ Mở Google Cloud</button>
-          <button id="oauthCreateProjectBtn" class="btn api-link-btn" type="button">↗ Tạo Project</button>
-          <label class="oauth-check"><input id="oauthProjectDone" type="checkbox"> Tôi đã chọn/tạo Project bằng account trên</label>
-          <button id="oauthWizardNext2" class="btn btn-primary" type="button">Tiếp tục →</button>
-        </div>
-
-        <div class="oauth-wizard-panel hidden" data-owpanel="3">
-          <div class="oauth-step-number">3</div>
-          <h3>Bật Google Drive API</h3>
-          <p>Trong đúng Project vừa chọn, mở Google Drive API và bấm <b>Enable</b> nếu chưa bật.</p>
-          <button id="oauthOpenDriveApiBtn" class="btn api-link-btn" type="button">↗ Mở Google Drive API</button>
-          <label class="oauth-check"><input id="oauthDriveDone" type="checkbox"> Tôi đã bật Google Drive API</label>
-          <button id="oauthWizardNext3" class="btn btn-primary" type="button">Tiếp tục →</button>
-        </div>
-
-        <div class="oauth-wizard-panel hidden" data-owpanel="4">
-          <div class="oauth-step-number">4</div>
-          <h3>Cấu hình OAuth consent screen</h3>
-          <p>Vào OAuth consent screen. Nếu Google yêu cầu, tạo/cấu hình màn hình xin quyền. Với app cá nhân/testing, thêm chính Google Account sẽ dùng app vào Test users nếu Google yêu cầu.</p>
-          <button id="oauthOpenConsentBtn" class="btn api-link-btn" type="button">↗ Mở OAuth Consent Screen</button>
-          <label class="oauth-check"><input id="oauthConsentDone" type="checkbox"> Tôi đã cấu hình Consent Screen và Test user nếu được yêu cầu</label>
-          <button id="oauthWizardNext4" class="btn btn-primary" type="button">Tiếp tục →</button>
-        </div>
-
-        <div class="oauth-wizard-panel hidden" data-owpanel="5">
-          <div class="oauth-step-number">5</div>
-          <h3>Tạo OAuth Client ID</h3>
-          <p>Vào Credentials → Create credentials → <b>OAuth client ID</b>. Chọn <b>Web application</b>.</p>
-          <button id="oauthOpenCredentialsBtn" class="btn api-link-btn" type="button">↗ Mở Credentials</button>
-          <div class="oauth-mini-help">
-            <b>Application type:</b> Web application<br>
-            Sau khi tạo, Google sẽ cung cấp một <b>Client ID</b> kết thúc bằng
-            <code>.apps.googleusercontent.com</code>.
+          <div class="backup-actions">
+            <button id="exportConfigBtn" class="btn btn-primary btn-block" type="button">⬇ Xuất file sao lưu (.json)</button>
+            <label class="btn btn-block file-btn" for="importConfigInput">⬆ Nhập file sao lưu (.json)</label>
+            <input id="importConfigInput" type="file" accept="application/json" class="hidden">
           </div>
-          <label class="oauth-check"><input id="oauthClientDone" type="checkbox"> Tôi đã tạo OAuth Client ID loại Web application</label>
-          <button id="oauthWizardNext5" class="btn btn-primary" type="button">Tiếp tục →</button>
+          <p id="backupMsg" class="hint"></p>
         </div>
 
-        <div class="oauth-wizard-panel hidden" data-owpanel="6">
-          <div class="oauth-step-number">6</div>
-          <h3>Thêm địa chỉ GitHub Pages vào Authorized JavaScript origins</h3>
-          <p>Trong OAuth Client vừa tạo, tìm <b>Authorized JavaScript origins</b> và thêm đúng địa chỉ website của app.</p>
-          <div class="oauth-origin-row">
-            <input id="oauthOriginValue" type="text" readonly>
-            <button id="oauthCopyOriginBtn" class="btn" type="button">📋 Copy</button>
+        <div class="settings-panel-content hidden" data-settings-panel="shortcuts">
+          <p class="hint">Dùng bàn phím hoặc điều khiển TV để thao tác nhanh hơn.</p>
+          <div class="shortcuts-grid">
+            <div class="shortcut-row"><kbd>M</kbd><span>Mở/đóng Cấu hình</span></div>
+            <div class="shortcut-row"><kbd>↑ ↓ ← →</kbd><span>Di chuyển giữa các thẻ video</span></div>
+            <div class="shortcut-row"><kbd>Enter</kbd><span>Mở video / bấm nút đang chọn</span></div>
+            <div class="shortcut-row"><kbd>Space</kbd> / <kbd>K</kbd><span>Phát - Tạm dừng</span></div>
+            <div class="shortcut-row"><kbd>← / J</kbd><span>Lùi 10 giây</span></div>
+            <div class="shortcut-row"><kbd>→ / L</kbd><span>Tiến 10 giây</span></div>
+            <div class="shortcut-row"><kbd>↑ / ↓</kbd><span>Tăng - giảm âm lượng</span></div>
+            <div class="shortcut-row"><kbd>F</kbd><span>Toàn màn hình</span></div>
+            <div class="shortcut-row"><kbd>C</kbd><span>Bật/tắt phụ đề</span></div>
+            <div class="shortcut-row"><kbd>Esc</kbd> / <kbd>Backspace</kbd><span>Quay lại danh sách</span></div>
           </div>
-          <div class="oauth-mini-help">Ví dụ: <code>https://minhvukgh1979-ux.github.io</code>. Không thêm dấu <code>/</code> ở cuối.</div>
-          <label class="oauth-check"><input id="oauthOriginDone" type="checkbox"> Tôi đã thêm origin này vào Google Cloud</label>
-          <button id="oauthWizardNext6" class="btn btn-primary" type="button">Tiếp tục →</button>
         </div>
 
-        <div class="oauth-wizard-panel hidden" data-owpanel="7">
-          <div class="oauth-step-number">7</div>
-          <h3>Đưa Client ID vào app</h3>
-          <p>Copy Client ID từ Google Cloud rồi dán vào ô dưới đây.</p>
-          <input id="oauthWizardClientId" type="text" placeholder="123456789012-xxxx.apps.googleusercontent.com" autocomplete="off">
-          <button id="oauthWizardSaveClientBtn" class="btn btn-primary" type="button">💾 Lưu Client ID →</button>
-          <div id="oauthWizardClientStatus" class="oauth-status"></div>
-        </div>
-
-        <div class="oauth-wizard-panel hidden" data-owpanel="8">
-          <div class="oauth-step-number">✓</div>
-          <h3>Kiểm tra quyền Google Drive</h3>
-          <p>App sẽ mở hộp thoại Google. Chọn đúng account <b id="oauthFinalAccountLabel"></b> và cấp quyền Drive.</p>
-          <button id="oauthWizardTestBtn" class="btn btn-primary" type="button">🔐 Đăng nhập & kiểm tra OAuth</button>
-          <div id="oauthWizardFinalStatus" class="oauth-status"></div>
-          <div class="oauth-note">✓ Khi báo OAuth thành công, máy này đã sẵn sàng đọc/ghi <code>app-config.json</code>.</div>
-        </div>
       </div>
 
-      <div class="shared-config-box">
-        <div class="shared-config-title">☁️ Đồng bộ cấu hình chung qua Google Drive</div>
-        <div class="shared-config-help">
-          App có thể lưu <b>toàn bộ account + API Key + folder</b> vào một file
-          <code>app-config.json</code> trong folder Drive dùng chung. Máy khác chỉ cần
-          mở app và đọc file này để có cấu hình mới nhất.
-          <br><b>Lưu ý:</b> API Key chỉ có thể đọc/ghi file Drive khi bạn cấp quyền Google
-          cho app; API Key đơn thuần không có quyền ghi Drive.
-        </div>
-        <div class="shared-config-row">
-          <input id="sharedConfigFolderLink" type="url" placeholder="Link folder Drive dùng để lưu app-config.json">
-          <button id="sharedConfigLoadBtn" class="btn" type="button">☁️ Đọc cấu hình</button>
-          <button id="sharedConfigSaveBtn" class="btn btn-primary" type="button">☁️ Lưu cấu hình chung</button>
-        </div>
-        <div id="sharedConfigStatus" class="shared-config-status"></div>
+      <div class="settings-footer">
+        <button id="saveBtn" class="btn btn-primary btn-lg" tabindex="0">💾 Lưu cấu hình</button>
+        <p id="settingsError" class="error"></p>
       </div>
-
-      <div class="settings-actions">
-        <button id="saveBtn" class="btn btn-primary" tabindex="0">Lưu cấu hình</button>
-        <button id="closeSettingsBtn" class="btn" tabindex="0">Đóng</button>
-      </div>
-
-      <p class="hint">
-        Mỗi folder phải để chia sẻ "Bất kỳ ai có đường liên kết - Người
-        xem". Muốn tính năng dự phòng hoạt động, các tài khoản nên chứa
-        video CÙNG TÊN file (không cần y hệt 100%, chỉ cần trùng phần
-        tên trước đuôi mở rộng). Nếu có file phụ đề (.srt) cùng tên với
-        video, phụ đề sẽ tự động gắn vào khi phát. Bấm phím <b>M</b> bất
-        cứ lúc nào để mở lại màn hình này.
-      </p>
-      <p id="settingsError" class="error"></p>
     </div>
   </div>
 
   <!-- ==================== MODAL SỬA VIDEO ==================== -->
   <div id="editModal" class="modal-overlay hidden">
     <div class="settings-box">
-      <h1>Sửa hiển thị</h1>
+      <h1>Sửa video</h1>
       <label for="editTitleInput">Tên hiển thị</label>
       <input id="editTitleInput" type="text" tabindex="0" />
+
+      <label for="editNoteInput">Ghi chú (chỉ mình bạn thấy)</label>
+      <textarea id="editNoteInput" tabindex="0" rows="3" placeholder="Vd. tập 1-5 đã xem, cần xem lại đoạn cuối..."></textarea>
+
+      <label class="wizard-check edit-watched-check">
+        <input id="editWatchedInput" type="checkbox"> Đánh dấu đã xem xong
+      </label>
+
       <div class="settings-actions">
         <button id="editSaveBtn" class="btn btn-primary" tabindex="0">Lưu</button>
         <button id="editResetBtn" class="btn" tabindex="0">Về tên gốc</button>
         <button id="editCancelBtn" class="btn" tabindex="0">Huỷ</button>
       </div>
       <p class="hint">
-        Đây chỉ là tên hiển thị trên trang này (lưu trong trình duyệt),
-        không đổi tên file thật trên Google Drive.
+        Đây chỉ là dữ liệu hiển thị trên trang này (lưu trong trình duyệt),
+        không đổi gì trên Google Drive thật.
       </p>
     </div>
   </div>
+
+  <!-- ==================== TOAST ==================== -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
   <script src="app.js"></script>
 </body>

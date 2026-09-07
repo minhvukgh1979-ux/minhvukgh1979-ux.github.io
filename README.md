@@ -147,7 +147,9 @@ Giao diện đã được làm lại đầy đủ hơn:
 2. Mở Google Cloud và **tạo/chọn Project bằng chính account mới**.
 3. Bật **Google Drive API** trong Project đó.
 4. Tạo **API Key** trong Credentials của Project đó và dán vào wizard.
-5. Nhập folder Drive của account mới và bấm **Kiểm tra folder**.
+5. **Tạo 1 folder Drive mới**, chia sẻ "Bất kỳ ai có đường liên kết" (chọn
+   quyền Người xem hoặc Người chỉnh sửa - xem chi tiết bên dưới), dán link
+   vào wizard và bấm **Kiểm tra folder**.
 6. Xem lại thông tin → **Thêm account này vào app**.
 
 App không copy API Key của account cũ. Mỗi account có cấu hình `googleAccount + apiKey + folderLink` riêng.
@@ -157,117 +159,17 @@ Google không cho GitHub Pages tự đăng nhập và tự tạo Project/API Key
 ### Lưu cấu hình
 Account được lưu vào `localStorage` của đúng domain GitHub Pages, đồng thời có bản sao dự phòng. Wizard bước cuối lưu ngay, không cần thao tác thêm. Khi mở lại `⚙️`, app đọc lại danh sách đã lưu và giữ cả Google Account, API Key, tên và Folder.
 
+Account chỉ được lưu **trên trình duyệt/máy đó**. Muốn dùng account này trên máy/TV khác, mở wizard "+ Thêm tài khoản" trên máy đó và nhập lại đúng Google Account + API Key + link folder (API Key và folder link không đổi giữa các máy, chỉ cần nhập lại 1 lần).
 
-## Đồng bộ toàn bộ account bằng một file trên Google Drive
+### Bước 5 (Folder) - chọn quyền chia sẻ nào?
 
-App hỗ trợ file `app-config.json` nằm trong một folder Drive dùng chung.
+Khi chia sẻ folder "Bất kỳ ai có đường liên kết", Google cho chọn 1 trong 2 quyền:
 
-### Cách dùng
-1. Tạo/chọn một folder Drive dùng làm **folder cấu hình chung**.
-2. Trong app → ⚙️ → phần `☁️ Đồng bộ cấu hình chung`.
-3. Dán link folder.
-4. Lần đầu, cấu hình Google OAuth Client ID trong app (Google OAuth là bắt buộc để **ghi** file; API Key chỉ đọc dữ liệu công khai và không có quyền ghi Drive).
-5. Bấm `☁️ Lưu cấu hình chung`.
-6. Máy khác mở app → dán cùng link folder → `☁️ Đọc cấu hình`.
+| Quyền | Xem/phát video qua app | Thêm/xoá video trực tiếp trên Drive |
+|---|---|---|
+| **Người xem** | ✅ | ❌ - chỉ đăng nhập đúng account chủ folder mới thêm/xoá được |
+| **Người chỉnh sửa** | ✅ | ✅ - ai có link cũng thêm/xoá được, không cần đăng nhập |
 
-`app-config.json` chứa toàn bộ `googleAccount`, `apiKey`, `label`, `folderLink`. Vì vậy máy mới đọc file sẽ có trạng thái account mới nhất.
+App chỉ dùng API Key để **đọc** (liệt kê + phát video) nên quyền nào cũng xem được như nhau. Chọn **Người chỉnh sửa** nếu muốn tiện tự thêm video từ nhiều máy/điện thoại mà không cần mở app; chọn **Người xem** nếu ưu tiên an toàn, không muốn người khác lỡ xoá nhầm file.
 
-### Vì sao cần OAuth?
-Google Drive API Key không có quyền sửa file Drive. Muốn app tự tạo/cập nhật `app-config.json`, người dùng phải cấp OAuth token với quyền Drive. Không có cách an toàn để GitHub Pages tự ghi Drive chỉ bằng API Key.
-
-**Cảnh báo:** nếu `app-config.json` nằm trong folder mà nhiều người có thể đọc, API Key cũng sẽ nằm trong đó. Chỉ dùng folder cấu hình cho những người bạn tin cậy; tốt nhất không chia sẻ file cấu hình cho người ngoài.
-
-
-# Hướng dẫn Google OAuth Client ID (chi tiết)
-
-## Mục đích
-
-API Key chỉ phục vụ các request API có API key; nó **không cấp quyền cho website sửa file trên Google Drive**. Để app có thể tạo/cập nhật `app-config.json`, người dùng phải cấp OAuth.
-
-## Làm lần đầu trên mỗi máy
-
-### Bước 1 — Mở Google Cloud
-Trong app: `⚙️ → 🔐 Cấu hình Google OAuth Client ID` → bấm **Google Cloud Console**.
-
-Đăng nhập Google Account có quyền với Project bạn dùng.
-
-### Bước 2 — Chọn Project
-Trên Google Cloud Console, chọn đúng Project. Nếu chưa có Project thì tạo Project trước.
-
-### Bước 3 — Bật Google Drive API
-Vào **APIs & Services → Library → Google Drive API → Enable**.
-
-### Bước 4 — Cấu hình OAuth consent screen
-Vào **APIs & Services → OAuth consent screen**.
-
-Nếu Google yêu cầu, tạo/cấu hình màn hình xin quyền. Chọn loại User Type phù hợp với tài khoản của bạn. Với app cá nhân/testing, có thể để chế độ test và thêm tài khoản dùng thử nếu Google yêu cầu.
-
-Khi cấu hình scopes, app cần quyền Drive để đọc/ghi `app-config.json`. App sử dụng scope:
-`https://www.googleapis.com/auth/drive`
-
-### Bước 5 — Tạo OAuth Client ID
-Vào **APIs & Services → Credentials → Create credentials → OAuth client ID**.
-
-Chọn:
-**Application type → Web application**
-
-### Bước 6 — Thêm Authorized JavaScript origins
-Trong OAuth Client, tại **Authorized JavaScript origins**, thêm chính domain GitHub Pages.
-
-Ví dụ:
-`https://minhvukgh1979-ux.github.io`
-
-Không thêm dấu `/` ở cuối.
-
-Nếu bạn dùng domain riêng thì thêm domain đó.
-
-### Bước 7 — Tạo và copy Client ID
-Bấm **Create**.
-
-Google sẽ cấp một Client ID dạng:
-`123456789012-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com`
-
-Copy toàn bộ chuỗi.
-
-### Bước 8 — Đưa Client ID vào app
-Trong app:
-`⚙️ → 🔐 Cấu hình Google OAuth Client ID`
-
-Dán Client ID → **💾 Lưu Client ID**.
-
-### Bước 9 — Kiểm tra OAuth
-Bấm **🔐 Thử đăng nhập Google**.
-
-Google sẽ hiện cửa sổ xin quyền. Chọn đúng Google Account và đồng ý quyền Drive.
-
-Nếu thành công, app báo:
-`✓ OAuth thành công`
-
-### Bước 10 — Lưu cấu hình chung
-Sau khi OAuth thành công:
-1. Dán link folder dùng làm folder cấu hình chung.
-2. Bấm **☁️ Lưu cấu hình chung**.
-3. App tạo/cập nhật `app-config.json`.
-
-Máy khác chỉ cần:
-1. Cấu hình OAuth Client ID cho domain đó.
-2. Đăng nhập Google.
-3. Dán cùng link folder cấu hình.
-4. Bấm **☁️ Đọc cấu hình**.
-
-## Quan trọng về account mới
-
-OAuth Client ID có thể được dùng bởi app trên cùng domain. Việc **account nào được cấp quyền** là do Google OAuth login. Khi thêm account phim mới, vẫn phải dùng đúng Google Account đó cho Cloud Project/API Key/Drive theo quy trình trong wizard.
-
-## Lưu ý bảo mật
-
-`app-config.json` chứa API Key theo yêu cầu của thiết kế hiện tại. Không đặt file này trong folder công khai cho người lạ. OAuth token không được ghi vào `app-config.json`.
-
-
-## OAuth Client ID trong app
-
-Phần OAuth Client ID hiện hiển thị dạng wizard giống quy trình `➕ Thêm Google Account mới`:
-
-**1 Account → 2 Project → 3 Drive API → 4 Consent → 5 Client ID → 6 Origin → 7 Nhập vào app → 8 Kiểm tra**
-
-App mở đúng trang Google Cloud ở từng bước, tự lấy `window.location.origin` làm Authorized JavaScript origin để người dùng copy, lưu Client ID và thử OAuth ngay trong app.
+> **Lưu ý:** API Key không có khái niệm "quyền ghi qua app" - quyền Xem/Chỉnh sửa ở đây là quyền chia sẻ file trên chính Google Drive (thao tác trực tiếp bằng tay hoặc app Drive), không liên quan gì đến việc app này đọc video.
