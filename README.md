@@ -37,21 +37,59 @@ quét 1 folder Google Drive mỗi lần mở lên và hiện sẵn mọi video t
 
 ### Bước 3 — Điền cấu hình vào web
 
-Mở file `app.js`, sửa 2 dòng đầu:
+Mở file `app.js`, sửa mảng `DEFAULT_ACCOUNTS` ở đầu file:
 
 ```js
-const DEFAULT_API_KEY = 'AIzaSy...';           // key ở Bước 2
-const DEFAULT_FOLDER_LINK = 'https://drive.google.com/drive/folders/XXXX'; // link ở Bước 1
+const DEFAULT_ACCOUNTS = [
+  {
+    label: 'minhvukgh1979',
+    apiKey: 'AIzaSy...',        // key ở Bước 2
+    folderLink: 'https://drive.google.com/drive/folders/XXXX' // link ở Bước 1
+  }
+];
 ```
 
 Lưu lại, đưa 3 file (`index.html`, `style.css`, `app.js`) lên GitHub
 Pages (hoặc bất kỳ hosting tĩnh nào). Xong — từ giờ mở trang lên là có
 video ngay, không cần nhập gì cả.
 
-> Nếu không muốn sửa `app.js` (ví dụ dùng chung code cho nhiều folder
-> khác nhau), có thể để 2 dòng đó trống — trang sẽ hỏi bạn nhập API Key
-> và link folder ngay lần mở đầu tiên, sau đó tự nhớ (lưu trong trình
-> duyệt), không hỏi lại nữa. Bấm phím **M** bất cứ lúc nào để đổi lại.
+> Nếu không muốn sửa `app.js`, có thể để `DEFAULT_ACCOUNTS = []` — trang
+> sẽ hỏi bạn nhập tài khoản ngay lần mở đầu tiên (qua màn hình Cấu
+> hình), sau đó tự nhớ (lưu trong trình duyệt), không hỏi lại nữa. Bấm
+> phím **M** bất cứ lúc nào để mở lại màn hình Cấu hình.
+
+## Dùng nhiều tài khoản Google Drive (để tránh giới hạn/quota)
+
+Nếu bạn upload CÙNG một bộ phim (cùng tên file) lên 2 (hoặc nhiều)
+tài khoản Google Drive khác nhau, web có thể tự quét cả 2 rồi gộp lại
+thành 1 danh sách — khi 1 tài khoản bị Google giới hạn (quota tải
+xuống), web tự động chuyển sang phát bản ở tài khoản kia, không cần
+bạn làm gì thêm.
+
+**Lưu ý quan trọng:** để tính năng dự phòng có tác dụng, tài khoản thứ
+2 cần một **folder THẬT SỰ khác** (chứa 1 bản copy phim, tốt nhất là
+thuộc chính Drive của tài khoản đó) — không phải cùng 1 folder ID với
+tài khoản 1. Nếu 2 "tài khoản" trỏ vào đúng 1 folder thì gộp lại cũng
+không giúp tránh giới hạn, vì Google tính quota theo từng FILE cụ thể.
+
+Các bước thêm tài khoản thứ 2 (ví dụ `minhvukgh1977`):
+
+1. Đăng nhập Google Drive bằng tài khoản `minhvukgh1977`, tạo 1 folder
+   mới, rồi upload vào đó các video (khuyến khích trùng tên file với
+   bản ở tài khoản 1, để web nhận ra là cùng 1 phim và gộp lại).
+2. Chia sẻ folder này giống Bước 1 ở trên: chuột phải → Chia sẻ →
+   "Bất kỳ ai có đường liên kết" → quyền "Người xem". Copy link folder.
+3. API Key ở Bước 2 dùng chung được cho mọi tài khoản (vì API Key là
+   của 1 project Google Cloud, không gắn với tài khoản Drive nào) —
+   không bắt buộc phải tạo Key riêng, dùng lại Key cũ cũng được.
+4. Mở web → bấm **⚙️ (Cấu hình)** hoặc phím **M** → bấm **"+ Thêm tài
+   khoản"** → điền tên gợi nhớ (vd. `minhvukgh1977`), API Key (bước 3),
+   và link folder (bước 2) → **Lưu cấu hình**.
+5. Web tự quét lại cả 2 tài khoản. Phim nào trùng tên sẽ hiện 1 thẻ
+   duy nhất kèm nhãn "2 nguồn" — khi phát mà tài khoản đầu bị lỗi/giới
+   hạn, web tự thử tài khoản còn lại.
+
+Có thể thêm nhiều hơn 2 tài khoản theo cách tương tự nếu cần.
 
 ## Từ giờ về sau
 
@@ -64,36 +102,6 @@ không cần đụng gì đến code hay GitHub nữa.
 Google bắt buộc mọi truy vấn vào Drive API phải xác thực bằng API Key
 hoặc đăng nhập (OAuth). API Key là lựa chọn nhẹ nhất — tạo 1 lần, không
 hết hạn, người xem không cần đăng nhập gì cả.
-
-## Thêm tài khoản Drive dự phòng (dùng khi 1 tài khoản bị lỗi quota)
-
-Sửa file **`accounts.json`** ngay trong repo (bấm biểu tượng bút chì ✎
-trên trang GitHub để sửa trực tiếp trên web, không cần cài gì) theo
-mẫu:
-
-```json
-[
-  { "apiKey": "AIzaSy...tài khoản 2...", "folderLink": "https://drive.google.com/drive/folders/...tài khoản 2..." }
-]
-```
-
-Commit lại là xong — **mọi máy/TV mở trang đều tự thấy ngay** từ lần
-tải trang kế tiếp, không cần sửa `app.js`, không cần cấu hình lại
-từng máy. Có thể thêm nhiều tài khoản, mỗi tài khoản 1 dòng
-`{ "apiKey": ..., "folderLink": ... }`, cách nhau bằng dấu phẩy.
-
-(Ngoài ra, trong màn hình Cài đặt ⚙️ của web cũng có nút "+ Thêm tài
-khoản dự phòng" — cách đó tiện để thử nhanh nhưng chỉ lưu riêng trên
-máy/trình duyệt đang dùng, không chia sẻ sang máy khác như
-`accounts.json`.)
-
-## TV đời cũ không đăng nhập được Google?
-
-Nếu TV chặn hẳn màn hình đăng nhập Google (lỗi "disallowed_useragent"),
-xem thư mục `server/` — đó là một server nhỏ chạy tại nhà (Windows),
-tự đăng nhập thay bạn bằng "service account", giúp TV xem video mà
-không cần đăng nhập và không bao giờ dính lỗi "download quota
-exceeded". Xem `server/README.md` để cài đặt.
 
 ## Giới hạn cần biết
 
@@ -129,3 +137,137 @@ Giao diện đã được làm lại đầy đủ hơn:
   - **Sắp xếp**: theo tên, mới thêm gần đây, hoặc yêu thích trước.
 - Muốn xoá/tải video thật sự thì vẫn thao tác trực tiếp trên Google
   Drive (hoặc qua extension) — trang web chỉ đọc, không có quyền ghi.
+
+
+## Quy trình thêm Google Account mới
+
+`⚙️ → + Thêm tài khoản` mở wizard 6 bước:
+
+1. Nhập **Google Account mới**.
+2. Mở Google Cloud và **tạo/chọn Project bằng chính account mới**.
+3. Bật **Google Drive API** trong Project đó.
+4. Tạo **API Key** trong Credentials của Project đó và dán vào wizard.
+5. Nhập folder Drive của account mới và bấm **Kiểm tra folder**.
+6. Xem lại thông tin → **Thêm account này vào app**.
+
+App không copy API Key của account cũ. Mỗi account có cấu hình `googleAccount + apiKey + folderLink` riêng.
+
+Google không cho GitHub Pages tự đăng nhập và tự tạo Project/API Key thay người dùng; vì vậy các thao tác xác nhận/tạo trên Google Cloud vẫn cần người dùng thực hiện, nhưng app mở đúng trang và dẫn theo thứ tự.
+
+### Lưu cấu hình
+Account được lưu vào `localStorage` của đúng domain GitHub Pages, đồng thời có bản sao dự phòng. Wizard bước cuối lưu ngay, không cần thao tác thêm. Khi mở lại `⚙️`, app đọc lại danh sách đã lưu và giữ cả Google Account, API Key, tên và Folder.
+
+
+## Đồng bộ toàn bộ account bằng một file trên Google Drive
+
+App hỗ trợ file `app-config.json` nằm trong một folder Drive dùng chung.
+
+### Cách dùng
+1. Tạo/chọn một folder Drive dùng làm **folder cấu hình chung**.
+2. Trong app → ⚙️ → phần `☁️ Đồng bộ cấu hình chung`.
+3. Dán link folder.
+4. Lần đầu, cấu hình Google OAuth Client ID trong app (Google OAuth là bắt buộc để **ghi** file; API Key chỉ đọc dữ liệu công khai và không có quyền ghi Drive).
+5. Bấm `☁️ Lưu cấu hình chung`.
+6. Máy khác mở app → dán cùng link folder → `☁️ Đọc cấu hình`.
+
+`app-config.json` chứa toàn bộ `googleAccount`, `apiKey`, `label`, `folderLink`. Vì vậy máy mới đọc file sẽ có trạng thái account mới nhất.
+
+### Vì sao cần OAuth?
+Google Drive API Key không có quyền sửa file Drive. Muốn app tự tạo/cập nhật `app-config.json`, người dùng phải cấp OAuth token với quyền Drive. Không có cách an toàn để GitHub Pages tự ghi Drive chỉ bằng API Key.
+
+**Cảnh báo:** nếu `app-config.json` nằm trong folder mà nhiều người có thể đọc, API Key cũng sẽ nằm trong đó. Chỉ dùng folder cấu hình cho những người bạn tin cậy; tốt nhất không chia sẻ file cấu hình cho người ngoài.
+
+
+# Hướng dẫn Google OAuth Client ID (chi tiết)
+
+## Mục đích
+
+API Key chỉ phục vụ các request API có API key; nó **không cấp quyền cho website sửa file trên Google Drive**. Để app có thể tạo/cập nhật `app-config.json`, người dùng phải cấp OAuth.
+
+## Làm lần đầu trên mỗi máy
+
+### Bước 1 — Mở Google Cloud
+Trong app: `⚙️ → 🔐 Cấu hình Google OAuth Client ID` → bấm **Google Cloud Console**.
+
+Đăng nhập Google Account có quyền với Project bạn dùng.
+
+### Bước 2 — Chọn Project
+Trên Google Cloud Console, chọn đúng Project. Nếu chưa có Project thì tạo Project trước.
+
+### Bước 3 — Bật Google Drive API
+Vào **APIs & Services → Library → Google Drive API → Enable**.
+
+### Bước 4 — Cấu hình OAuth consent screen
+Vào **APIs & Services → OAuth consent screen**.
+
+Nếu Google yêu cầu, tạo/cấu hình màn hình xin quyền. Chọn loại User Type phù hợp với tài khoản của bạn. Với app cá nhân/testing, có thể để chế độ test và thêm tài khoản dùng thử nếu Google yêu cầu.
+
+Khi cấu hình scopes, app cần quyền Drive để đọc/ghi `app-config.json`. App sử dụng scope:
+`https://www.googleapis.com/auth/drive`
+
+### Bước 5 — Tạo OAuth Client ID
+Vào **APIs & Services → Credentials → Create credentials → OAuth client ID**.
+
+Chọn:
+**Application type → Web application**
+
+### Bước 6 — Thêm Authorized JavaScript origins
+Trong OAuth Client, tại **Authorized JavaScript origins**, thêm chính domain GitHub Pages.
+
+Ví dụ:
+`https://minhvukgh1979-ux.github.io`
+
+Không thêm dấu `/` ở cuối.
+
+Nếu bạn dùng domain riêng thì thêm domain đó.
+
+### Bước 7 — Tạo và copy Client ID
+Bấm **Create**.
+
+Google sẽ cấp một Client ID dạng:
+`123456789012-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com`
+
+Copy toàn bộ chuỗi.
+
+### Bước 8 — Đưa Client ID vào app
+Trong app:
+`⚙️ → 🔐 Cấu hình Google OAuth Client ID`
+
+Dán Client ID → **💾 Lưu Client ID**.
+
+### Bước 9 — Kiểm tra OAuth
+Bấm **🔐 Thử đăng nhập Google**.
+
+Google sẽ hiện cửa sổ xin quyền. Chọn đúng Google Account và đồng ý quyền Drive.
+
+Nếu thành công, app báo:
+`✓ OAuth thành công`
+
+### Bước 10 — Lưu cấu hình chung
+Sau khi OAuth thành công:
+1. Dán link folder dùng làm folder cấu hình chung.
+2. Bấm **☁️ Lưu cấu hình chung**.
+3. App tạo/cập nhật `app-config.json`.
+
+Máy khác chỉ cần:
+1. Cấu hình OAuth Client ID cho domain đó.
+2. Đăng nhập Google.
+3. Dán cùng link folder cấu hình.
+4. Bấm **☁️ Đọc cấu hình**.
+
+## Quan trọng về account mới
+
+OAuth Client ID có thể được dùng bởi app trên cùng domain. Việc **account nào được cấp quyền** là do Google OAuth login. Khi thêm account phim mới, vẫn phải dùng đúng Google Account đó cho Cloud Project/API Key/Drive theo quy trình trong wizard.
+
+## Lưu ý bảo mật
+
+`app-config.json` chứa API Key theo yêu cầu của thiết kế hiện tại. Không đặt file này trong folder công khai cho người lạ. OAuth token không được ghi vào `app-config.json`.
+
+
+## OAuth Client ID trong app
+
+Phần OAuth Client ID hiện hiển thị dạng wizard giống quy trình `➕ Thêm Google Account mới`:
+
+**1 Account → 2 Project → 3 Drive API → 4 Consent → 5 Client ID → 6 Origin → 7 Nhập vào app → 8 Kiểm tra**
+
+App mở đúng trang Google Cloud ở từng bước, tự lấy `window.location.origin` làm Authorized JavaScript origin để người dùng copy, lưu Client ID và thử OAuth ngay trong app.
